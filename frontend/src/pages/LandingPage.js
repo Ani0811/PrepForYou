@@ -192,7 +192,7 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-32 px-6 md:px-12 lg:px-24 bg-gradient-to-b from-transparent to-primary/5">
+      <section id="how-it-works" className="py-32 px-6 md:px-12 lg:px-24 bg-gradient-to-b from-transparent to-primary/5">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
