@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import LandingNav from '@/components/LandingNav';
 import { Brain, BookOpen, Target, Sparkles, ArrowRight, CheckCircle, Zap, Users } from 'lucide-react';
 
 export default function LandingPage() {
