@@ -1,0 +1,147 @@
+{
+  "identity": {
+    "persona": "E1: The Anti-AI Designer",
+    "mission": "Create a distinctive, premium UI for PrepForYou that feels intelligent, modern, and focused. Avoid generic templates.",
+    "principles": [
+      "Fusion over Imitation: Mix disparate disciplines.",
+      "Emotion First: Design for feeling, not just function.",
+      "Content is King: Tell a story.",
+      "Zoom In: Bold focus on details.",
+      "Negative Space: Value empty areas.",
+      "Contrast: Light vs Dark, Rough vs Smooth."
+    ],
+    "anti_patterns": [
+      "Purple/Teal for CTA (unless intentional)",
+      "Inter everywhere (visual monotony)",
+      "Center-Everything Disease",
+      "Gradient Overload"
+    ]
+  },
+  "typography": {
+    "primary_font": "Inter",
+    "secondary_font": "Outfit",
+    "usage": {
+      "headings": "Outfit (Weights: 600, 700) - Use for H1-H3. Tight tracking (-0.02em).",
+      "body": "Inter (Weights: 400, 500) - Use for paragraphs, inputs, labels.",
+      "mono": "JetBrains Mono - Use for code snippets, technical data, or tiny labels."
+    },
+    "scale": {
+      "h1": "text-5xl md:text-7xl font-bold tracking-tight",
+      "h2": "text-3xl md:text-5xl font-semibold tracking-tight",
+      "h3": "text-2xl md:text-3xl font-medium",
+      "body": "text-base md:text-lg leading-relaxed",
+      "small": "text-sm font-medium tracking-wide uppercase text-muted-foreground"
+    }
+  },
+  "colors": {
+    "theme": "dark-first",
+    "palette": {
+      "background": "#030712",
+      "foreground": "#F9FAFB",
+      "card": "#111827",
+      "card_foreground": "#F9FAFB",
+      "popover": "#030712",
+      "popover_foreground": "#F9FAFB",
+      "primary": "#7C3AED",
+      "primary_foreground": "#FFFFFF",
+      "secondary": "#1F2937",
+      "secondary_foreground": "#F9FAFB",
+      "muted": "#1F2937",
+      "muted_foreground": "#9CA3AF",
+      "accent": "#06B6D4",
+      "accent_foreground": "#FFFFFF",
+      "destructive": "#EF4444",
+      "destructive_foreground": "#FFFFFF",
+      "border": "#1F2937",
+      "input": "#1F2937",
+      "ring": "#7C3AED"
+    },
+    "gradients": {
+      "hero_glow": "radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.15) 0%, transparent 50%)",
+      "card_hover": "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)",
+      "text_gradient": "linear-gradient(to right, #F9FAFB, #9CA3AF)"
+    }
+  },
+  "spacing": {
+    "scale": "Tailwind Scale (p-1 to p-64)",
+    "philosophy": "Generous. Use 2-3x more spacing than typical designs.",
+    "container_padding": "px-6 md:px-12 lg:px-24",
+    "section_gap": "gap-16 md:gap-32"
+  },
+  "layout": {
+    "grid_system": "Bento Grid (Mode A for Marketing, Mode B for Dashboard)",
+    "marketing": {
+      "mode": "Mode A: The Tetris Grid",
+      "columns": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12",
+      "gap": "gap-8 md:gap-12"
+    },
+    "dashboard": {
+      "mode": "Mode B: High Density Grid",
+      "columns": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4",
+      "gap": "gap-4 md:gap-6"
+    },
+    "alignment": "Optical alignment. Left-align text for readability. Center only for specific hero moments."
+  },
+  "components": {
+    "buttons": {
+      "style": "Pill-shaped or sharp with slight radius (rounded-md).",
+      "interaction": "Scale on hover (scale-105), active press (scale-95).",
+      "gradient_border": "Use a subtle gradient border for primary buttons."
+    },
+    "cards": {
+      "style": "Flat background (bg-card) with 1px border (border-border).",
+      "hover": "Lift effect (-translate-y-1), shadow-lg, border color lighten.",
+      "glass": "Use glassmorphism for floating elements (bg-black/40 backdrop-blur-xl border-white/10)."
+    },
+    "inputs": {
+      "style": "Minimalist. bg-secondary/50 border-transparent focus:border-primary focus:ring-1 focus:ring-primary.",
+      "height": "h-12 for better touch targets."
+    }
+  },
+  "visual_enhancers": {
+    "textures": "Add subtle noise texture to the background to avoid 'digital flatness'.",
+    "glows": "Use radial gradients behind hero sections and key elements.",
+    "borders": "Use 'Tracing Beam' effect for high-conversion cards.",
+    "glassmorphism": "Use for sticky headers and modals (backdrop-blur-xl)."
+  },
+  "motion": {
+    "library": "Framer Motion",
+    "principles": "Subtle, fast, purposeful.",
+    "transitions": {
+      "hover": "transition: transform 0.2s ease, opacity 0.2s ease",
+      "page": "Fade + Translate Y (opacity: 0 -> 1, y: 20 -> 0)"
+    },
+    "accessibility": "Respect prefers-reduced-motion."
+  },
+  "media": {
+    "image_urls": {
+      "hero_background": "https://images.unsplash.com/photo-1647356191320-d7a1f80ca777",
+      "student_focused": "https://images.pexels.com/photos/33745700/pexels-photo-33745700.jpeg",
+      "study_desk": "https://images.unsplash.com/photo-1574081105756-3c8d8ed70198",
+      "abstract_ai": "https://images.unsplash.com/photo-1768327239584-e97d004f1830"
+    },
+    "icons": "Lucide React (default). Use Phosphor Icons for dense dashboards if needed."
+  },
+  "instructions_to_main_agent": [
+    "Follow the E1 Persona strictly.",
+    "Implement the Dark-First theme using the provided color palette.",
+    "Use the 'Outfit' font for headings and 'Inter' for body.",
+    "Build the layout using the Bento Grid system.",
+    "Apply the specified animations using Framer Motion.",
+    "Use the provided image URLs for placeholders.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Do NOT use generic Tailwind templates.",
+    "Create a 'design_system' folder if needed to organize styles.",
+    "Prioritize accessibility (contrast, focus states)."
+  ],
+  "universal_guidelines": [
+    "Avoid 'AI slop' aesthetic.",
+    "Create depth through z-index and layered elements.",
+    "No universal transitions (transition: all).",
+    "No center-aligned app containers.",
+    "Use micro-animations for every interaction.",
+    "Use 2-3x more spacing than comfortable.",
+    "Use named exports for components, default for pages.",
+    "Use Sonner for toasts."
+  ]
+}
