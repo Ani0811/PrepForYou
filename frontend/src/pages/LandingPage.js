@@ -60,8 +60,10 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#030712] text-foreground overflow-hidden">
+      <LandingNav />
+      
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 md:px-12 lg:px-24">
+      <section className="relative min-h-screen flex items-center justify-center px-6 md:px-12 lg:px-24 pt-16">
         {/* Hero Glow */}
         <div 
           className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[800px] opacity-40"
