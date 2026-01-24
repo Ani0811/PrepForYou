@@ -78,7 +78,7 @@ export default function LandingPage() {
           animate="visible"
           className="relative z-10 max-w-6xl mx-auto text-center"
         >
-          <motion.div variants={itemVariants} className="inline-block mb-6">
+          <motion.div variants={itemVariants} className="inline-block mt-8 mb-6">
             <span className="px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium tracking-wide">
               ✨ Your AI Study Companion
             </span>
