@@ -11,8 +11,6 @@ import reflectionRoutes from './routes/reflection.routes'
 import reviewRoutes from './routes/review.routes'
 import aiOutputRoutes from './routes/aiOutput.routes'
 
-// Middleware is imported where it's used (in routes and controllers)
-
 // Load environment variables
 dotenv.config()
 
