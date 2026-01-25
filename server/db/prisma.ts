@@ -1,15 +1,12 @@
-import pkg from '@prisma/client'
-
-const PrismaClientImpl = (pkg as any).PrismaClient ?? pkg
+import { PrismaClient } from "@prisma/client";
 
 declare global {
 	// eslint-disable-next-line no-var
-	var prisma: any | undefined
+	var prisma: PrismaClient | undefined
 }
 
-export const prisma = global.prisma ?? new (PrismaClientImpl as any)()
+export const prisma = global.prisma ?? new PrismaClient()
 
 if (process.env.NODE_ENV !== 'production') global.prisma = prisma
 
 export default prisma
-
