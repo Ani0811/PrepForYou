@@ -11,18 +11,21 @@ export const enforceReflectionBeforeComplete = async (
   next: NextFunction
 ) => {
   try {
-    const { id: materialId } = req.params
+    const materialId = String(req.params.id)
     const userId = (req as any).userId
     
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized - No user ID found' })
     }
     
-    // Check if reflection exists for this material and user
-    const reflection = await prisma.reflection.findFirst({
+    // Resolve topic_id for the material, then check if a reflection exists for that topic and user
+    const material = await prisma.materials.findUnique({ where: { id: materialId } })
+    const topicId = material?.topic_id ?? undefined
+
+    const reflection = await prisma.reflections.findFirst({
       where: {
-        materialId,
-        userId,
+        topic_id: topicId,
+        user_id: userId,
       },
     })
     
@@ -73,17 +76,24 @@ export const preventDuplicateReflection = async (
   next: NextFunction
 ) => {
   try {
-    const { materialId } = req.body
+    const { materialId, topicId } = req.body
     const userId = (req as any).userId
     
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized - No user ID found' })
     }
     
-    const existingReflection = await prisma.reflection.findFirst({
+    // Determine topic_id from provided topicId or from material
+    let resolvedTopicId: string | undefined = topicId
+    if (!resolvedTopicId && materialId) {
+      const material = await prisma.materials.findUnique({ where: { id: String(materialId) } })
+      resolvedTopicId = material?.topic_id ?? undefined
+    }
+
+    const existingReflection = await prisma.reflections.findFirst({
       where: {
-        materialId,
-        userId,
+        topic_id: resolvedTopicId,
+        user_id: userId,
       },
     })
     
@@ -111,23 +121,18 @@ export const enforceReviewInterval = async (
   next: NextFunction
 ) => {
   try {
-    const { id: reviewId } = req.params
-    
-    const review = await prisma.review.findUnique({
+    const reviewId = String(req.params.id)
+
+    const review = await prisma.reviews.findUnique({
       where: { id: reviewId },
     })
-    
+
     if (!review) {
       return res.status(404).json({ error: 'Review not found' })
     }
-    
-    if (review.nextReviewDate && new Date() < review.nextReviewDate) {
-      return res.status(400).json({ 
-        error: 'Review not due yet',
-        message: 'This material is not scheduled for review yet',
-        nextReviewDate: review.nextReviewDate
-      })
-    }
+
+    // The current schema does not include a scheduling/nextReviewDate field.
+    // Allow review actions for existing reviews; implement scheduling logic when schema supports it.
     
     next()
   } catch (error) {

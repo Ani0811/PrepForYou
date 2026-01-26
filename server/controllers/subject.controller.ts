@@ -3,7 +3,7 @@ import { prisma } from '../db/prisma'
 
 export const getAllSubjects = async (req: Request, res: Response) => {
   try {
-    const subjects = await prisma.subject.findMany({
+    const subjects = await prisma.subjects.findMany({
       include: {
         topics: true,
       },
@@ -17,8 +17,8 @@ export const getAllSubjects = async (req: Request, res: Response) => {
 export const getSubjectById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const subject = await prisma.subject.findUnique({
-      where: { id },
+    const subject = await prisma.subjects.findUnique({
+      where: { id: id as string },
       include: {
         topics: {
           include: {
@@ -40,9 +40,9 @@ export const getSubjectById = async (req: Request, res: Response) => {
 
 export const createSubject = async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body
-    const subject = await prisma.subject.create({
-      data: { name, description },
+    const { title } = req.body
+    const subject = await prisma.subjects.create({
+      data: { title },
     })
     res.status(201).json(subject)
   } catch (error) {
@@ -53,10 +53,10 @@ export const createSubject = async (req: Request, res: Response) => {
 export const updateSubject = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, description } = req.body
-    const subject = await prisma.subject.update({
-      where: { id },
-      data: { name, description },
+    const { title } = req.body
+    const subject = await prisma.subjects.update({
+      where: { id: id as string },
+      data: { title },
     })
     res.json(subject)
   } catch (error) {
@@ -67,8 +67,8 @@ export const updateSubject = async (req: Request, res: Response) => {
 export const deleteSubject = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.subject.delete({
-      where: { id },
+    await prisma.subjects.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {

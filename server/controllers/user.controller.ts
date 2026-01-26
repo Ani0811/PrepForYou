@@ -3,12 +3,11 @@ import { prisma } from '../db/prisma'
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
+    const users = await prisma.users.findMany({
       include: {
-        materials: true,
+        subjects: true,
         reflections: true,
         reviews: true,
-        aiOutputs: true,
       },
     })
     res.json(users)
@@ -20,13 +19,12 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const user = await prisma.user.findUnique({
-      where: { id },
+    const user = await prisma.users.findUnique({
+      where: { id: id as string },
       include: {
-        materials: true,
+        subjects: true,
         reflections: true,
         reviews: true,
-        aiOutputs: true,
       },
     })
     
@@ -48,13 +46,12 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' })
     }
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       include: {
-        materials: true,
+        subjects: true,
         reflections: true,
         reviews: true,
-        aiOutputs: true,
       },
     })
     
@@ -70,10 +67,10 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const { id, email, name, role } = req.body
+    const { id, clerk_user_id, email, name, role } = req.body
     
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.users.findUnique({
       where: { id },
     })
     
@@ -81,9 +78,10 @@ export const createUser = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'User already exists' })
     }
     
-    const user = await prisma.user.create({
+    const user = await prisma.users.create({
       data: {
         id,
+        clerk_user_id: clerk_user_id || id,
         email,
         name,
         role: role || 'user',
@@ -101,8 +99,8 @@ export const updateUser = async (req: Request, res: Response) => {
     const { id } = req.params
     const { email, name, role } = req.body
     
-    const user = await prisma.user.update({
-      where: { id },
+    const user = await prisma.users.update({
+      where: { id: id as string },
       data: { email, name, role },
     })
     
@@ -122,7 +120,7 @@ export const updateCurrentUser = async (req: Request, res: Response) => {
     
     const { email, name } = req.body
     
-    const user = await prisma.user.update({
+    const user = await prisma.users.update({
       where: { id: userId },
       data: { email, name },
     })
@@ -136,8 +134,8 @@ export const updateCurrentUser = async (req: Request, res: Response) => {
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.user.delete({
-      where: { id },
+    await prisma.users.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {
@@ -148,20 +146,18 @@ export const deleteUser = async (req: Request, res: Response) => {
 export const getUserStats = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
+    const userId = id as string
     
-    const [materialsCount, reflectionsCount, reviewsCount, completedMaterialsCount] = await Promise.all([
-      prisma.material.count({ where: { userId: id } }),
-      prisma.reflection.count({ where: { userId: id } }),
-      prisma.review.count({ where: { userId: id } }),
-      prisma.material.count({ where: { userId: id, completed: true } }),
+    const [reflectionsCount, reviewsCount, subjectsCount] = await Promise.all([
+      prisma.reflections.count({ where: { user_id: userId } }),
+      prisma.reviews.count({ where: { user_id: userId } }),
+      prisma.subjects.count({ where: { user_id: userId } }),
     ])
     
     const stats = {
-      materialsCount,
       reflectionsCount,
       reviewsCount,
-      completedMaterialsCount,
-      completionRate: materialsCount > 0 ? (completedMaterialsCount / materialsCount) * 100 : 0,
+      subjectsCount,
     }
     
     res.json(stats)

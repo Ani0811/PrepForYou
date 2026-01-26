@@ -3,25 +3,22 @@ import { prisma } from '../db/prisma'
 
 export const getAllReviews = async (req: Request, res: Response) => {
   try {
-    const { materialId, userId } = req.query
-    const reviews = await prisma.review.findMany({
+    const { topicId, userId } = req.query
+    const reviews = await prisma.reviews.findMany({
       where: {
-        materialId: materialId ? String(materialId) : undefined,
-        userId: userId ? String(userId) : undefined,
+        topic_id: topicId ? String(topicId) : undefined,
+        user_id: userId ? String(userId) : undefined,
       },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
+        users: true,
       },
       orderBy: {
-        nextReviewDate: 'asc',
+        reviewed_at: 'desc',
       },
     })
     res.json(reviews)
@@ -33,18 +30,15 @@ export const getAllReviews = async (req: Request, res: Response) => {
 export const getReviewById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const review = await prisma.review.findUnique({
-      where: { id },
+    const review = await prisma.reviews.findUnique({
+      where: { id: id as string },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
+        users: true,
       },
     })
     
@@ -60,14 +54,14 @@ export const getReviewById = async (req: Request, res: Response) => {
 
 export const createReview = async (req: Request, res: Response) => {
   try {
-    const { materialId, userId, nextReviewDate } = req.body
-    
-    const review = await prisma.review.create({
+    const { topicId, userId, confidence_level } = req.body
+
+    const review = await prisma.reviews.create({
       data: {
-        materialId,
-        userId,
-        nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : undefined,
-        reviewCount: 0,
+        topic_id: topicId,
+        user_id: userId,
+        confidence_level: confidence_level || 'unknown',
+        reviewed_at: new Date(),
       },
     })
     
@@ -80,23 +74,21 @@ export const createReview = async (req: Request, res: Response) => {
 export const updateReview = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { confidence, nextReviewDate } = req.body
-    
-    const review = await prisma.review.findUnique({
-      where: { id },
+    const { confidence_level } = req.body
+
+    const review = await prisma.reviews.findUnique({
+      where: { id: id as string },
     })
-    
+
     if (!review) {
       return res.status(404).json({ error: 'Review not found' })
     }
-    
-    const updatedReview = await prisma.review.update({
-      where: { id },
+
+    const updatedReview = await prisma.reviews.update({
+      where: { id: id as string },
       data: {
-        confidence,
-        lastReviewDate: new Date(),
-        nextReviewDate: nextReviewDate ? new Date(nextReviewDate) : undefined,
-        reviewCount: review.reviewCount + 1,
+        confidence_level: confidence_level || review.confidence_level,
+        reviewed_at: new Date(),
       },
     })
     
@@ -109,8 +101,8 @@ export const updateReview = async (req: Request, res: Response) => {
 export const deleteReview = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.review.delete({
-      where: { id },
+    await prisma.reviews.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {
@@ -121,27 +113,24 @@ export const deleteReview = async (req: Request, res: Response) => {
 export const getDueReviews = async (req: Request, res: Response) => {
   try {
     const { userId } = req.query
-    
-    const reviews = await prisma.review.findMany({
+
+    const reviews = await prisma.reviews.findMany({
       where: {
-        userId: userId ? String(userId) : undefined,
-        nextReviewDate: {
+        user_id: userId ? String(userId) : undefined,
+        reviewed_at: {
           lte: new Date(),
         },
       },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
+        users: true,
       },
       orderBy: {
-        nextReviewDate: 'asc',
+        reviewed_at: 'asc',
       },
     })
     

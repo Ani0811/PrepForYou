@@ -3,25 +3,22 @@ import { prisma } from '../db/prisma'
 
 export const getAllReflections = async (req: Request, res: Response) => {
   try {
-    const { materialId, userId } = req.query
-    const reflections = await prisma.reflection.findMany({
+    const { topicId, userId } = req.query
+    const reflections = await prisma.reflections.findMany({
       where: {
-        materialId: materialId ? String(materialId) : undefined,
-        userId: userId ? String(userId) : undefined,
+        topic_id: topicId ? String(topicId) : undefined,
+        user_id: userId ? String(userId) : undefined,
       },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
+        users: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        created_at: 'desc',
       },
     })
     res.json(reflections)
@@ -33,18 +30,15 @@ export const getAllReflections = async (req: Request, res: Response) => {
 export const getReflectionById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const reflection = await prisma.reflection.findUnique({
-      where: { id },
+    const reflection = await prisma.reflections.findUnique({
+      where: { id: id as string },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
+        users: true,
       },
     })
     
@@ -60,22 +54,22 @@ export const getReflectionById = async (req: Request, res: Response) => {
 
 export const createReflection = async (req: Request, res: Response) => {
   try {
-    const { content, materialId, userId } = req.body
-    
-    // Check if user has already reflected on this material
-    const existingReflection = await prisma.reflection.findFirst({
+    const { learned, topicId, userId } = req.body
+
+    // Check if user has already reflected on this topic
+    const existingReflection = await prisma.reflections.findFirst({
       where: {
-        materialId,
-        userId,
+        topic_id: topicId,
+        user_id: userId,
       },
     })
-    
+
     if (existingReflection) {
-      return res.status(400).json({ error: 'Reflection already exists for this material' })
+      return res.status(400).json({ error: 'Reflection already exists for this topic' })
     }
-    
-    const reflection = await prisma.reflection.create({
-      data: { content, materialId, userId },
+
+    const reflection = await prisma.reflections.create({
+      data: { learned, topic_id: topicId, user_id: userId },
     })
     
     res.status(201).json(reflection)
@@ -87,10 +81,10 @@ export const createReflection = async (req: Request, res: Response) => {
 export const updateReflection = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { content } = req.body
-    const reflection = await prisma.reflection.update({
-      where: { id },
-      data: { content },
+    const { learned } = req.body
+    const reflection = await prisma.reflections.update({
+      where: { id: id as string },
+      data: { learned },
     })
     res.json(reflection)
   } catch (error) {
@@ -101,8 +95,8 @@ export const updateReflection = async (req: Request, res: Response) => {
 export const deleteReflection = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.reflection.delete({
-      where: { id },
+    await prisma.reflections.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {

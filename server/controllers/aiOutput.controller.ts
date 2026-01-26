@@ -3,26 +3,21 @@ import { prisma } from '../db/prisma'
 
 export const getAllAIOutputs = async (req: Request, res: Response) => {
   try {
-    const { materialId, userId, type } = req.query
-    const aiOutputs = await prisma.aIOutput.findMany({
+    const { materialId, type } = req.query
+    const aiOutputs = await prisma.ai_outputs.findMany({
       where: {
-        materialId: materialId ? String(materialId) : undefined,
-        userId: userId ? String(userId) : undefined,
-        type: type ? String(type) : undefined,
+        topic_id: materialId ? String(materialId) : undefined,
+        action: type ? String(type) : undefined,
       },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        created_at: 'desc',
       },
     })
     res.json(aiOutputs)
@@ -34,16 +29,12 @@ export const getAllAIOutputs = async (req: Request, res: Response) => {
 export const getAIOutputById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const aiOutput = await prisma.aIOutput.findUnique({
-      where: { id },
+    const aiOutput = await prisma.ai_outputs.findUnique({
+      where: { id: id as string },
       include: {
-        material: {
+        topics: {
           include: {
-            topic: {
-              include: {
-                subject: true,
-              },
-            },
+            subjects: true,
           },
         },
       },
@@ -61,15 +52,14 @@ export const getAIOutputById = async (req: Request, res: Response) => {
 
 export const createAIOutput = async (req: Request, res: Response) => {
   try {
-    const { type, content, materialId, userId, metadata } = req.body
-    
-    const aiOutput = await prisma.aIOutput.create({
+    const { type, content, materialId, source_type } = req.body
+
+    const aiOutput = await prisma.ai_outputs.create({
       data: {
-        type,
+        action: type,
+        source_type: source_type || 'unknown',
         content,
-        materialId,
-        userId,
-        metadata: metadata || {},
+        topic_id: materialId,
       },
     })
     
@@ -82,13 +72,12 @@ export const createAIOutput = async (req: Request, res: Response) => {
 export const updateAIOutput = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { content, metadata } = req.body
-    
-    const aiOutput = await prisma.aIOutput.update({
-      where: { id },
+    const { content } = req.body
+
+    const aiOutput = await prisma.ai_outputs.update({
+      where: { id: id as string },
       data: {
         content,
-        metadata: metadata || undefined,
       },
     })
     
@@ -101,8 +90,8 @@ export const updateAIOutput = async (req: Request, res: Response) => {
 export const deleteAIOutput = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.aIOutput.delete({
-      where: { id },
+    await prisma.ai_outputs.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {

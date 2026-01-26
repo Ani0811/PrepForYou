@@ -4,10 +4,10 @@ import { prisma } from '../db/prisma'
 export const getAllTopics = async (req: Request, res: Response) => {
   try {
     const { subjectId } = req.query
-    const topics = await prisma.topic.findMany({
-      where: subjectId ? { subjectId: String(subjectId) } : undefined,
+    const topics = await prisma.topics.findMany({
+      where: subjectId ? { subject_id: String(subjectId) } : undefined,
       include: {
-        subject: true,
+        subjects: true,
         materials: true,
       },
     })
@@ -20,10 +20,10 @@ export const getAllTopics = async (req: Request, res: Response) => {
 export const getTopicById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const topic = await prisma.topic.findUnique({
-      where: { id },
+    const topic = await prisma.topics.findUnique({
+      where: { id: id as string },
       include: {
-        subject: true,
+        subjects: true,
         materials: true,
       },
     })
@@ -40,9 +40,9 @@ export const getTopicById = async (req: Request, res: Response) => {
 
 export const createTopic = async (req: Request, res: Response) => {
   try {
-    const { name, description, subjectId } = req.body
-    const topic = await prisma.topic.create({
-      data: { name, description, subjectId },
+    const { name, subjectId } = req.body
+    const topic = await prisma.topics.create({
+      data: { title: name, subject_id: subjectId },
     })
     res.status(201).json(topic)
   } catch (error) {
@@ -53,10 +53,10 @@ export const createTopic = async (req: Request, res: Response) => {
 export const updateTopic = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { name, description, subjectId } = req.body
-    const topic = await prisma.topic.update({
-      where: { id },
-      data: { name, description, subjectId },
+    const { name, subjectId } = req.body
+    const topic = await prisma.topics.update({
+      where: { id: id as string },
+      data: { title: name, subject_id: subjectId },
     })
     res.json(topic)
   } catch (error) {
@@ -67,8 +67,8 @@ export const updateTopic = async (req: Request, res: Response) => {
 export const deleteTopic = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    await prisma.topic.delete({
-      where: { id },
+    await prisma.topics.delete({
+      where: { id: id as string },
     })
     res.status(204).send()
   } catch (error) {
