@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import prisma from './db/prisma'
 
 // Import routes
 import userRoutes from './routes/user.routes'
@@ -64,6 +65,16 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🔗 API available at http://localhost:${PORT}`)
+
+  // Temporary sanity check: log users
+  ;(async () => {
+    try {
+      const users = await prisma.users.findMany()
+      console.log('Prisma sanity check - users:', users)
+    } catch (err) {
+      console.error('Prisma sanity check failed:', err)
+    }
+  })()
 })
 
 export default app

@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
@@ -5,6 +6,11 @@ import { Pool } from 'pg'
 declare global {
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined
+}
+
+// Ensure DATABASE_URL is loaded before creating pool
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is not defined in environment variables')
 }
 
 // Prisma 7.x requires adapter for database connections
