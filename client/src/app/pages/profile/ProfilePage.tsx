@@ -135,35 +135,43 @@ export default function ProfilePage() {
     
     setIsSaving(true);
     try {
-      // For now, we'll use a data URL. In production, you'd upload to cloud storage
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const dataUrl = reader.result as string;
-        try {
-          await updateUserProfile(user.uid, {
-            avatarUrl: dataUrl,
-            avatarProvider: 'custom'
-          });
-          // Only update Firebase `photoURL` if user opted in (prevents overwriting Google avatar by default)
-          if (applyToFirebase) {
-            try { await updateProfile(user, { photoURL: dataUrl }); } catch (e) { console.warn('Failed to update Firebase profile photo:', e); }
-          }
-          toast.success('Avatar updated successfully!');
-          setIsAvatarDialogOpen(false);
-          setSelectedAvatarFile(null);
-          // notify other components (Header) that profile/avatar changed
-          try { window.dispatchEvent(new CustomEvent('pfy:user-updated', { detail: { uid: user.uid } })); } catch (e) { /* ignore */ }
-        } catch (error: any) {
-          console.error('Error updating avatar:', error);
-          toast.error(error.message || 'Failed to update avatar');
-        } finally {
-          setIsSaving(false);
+      // Upload avatar to Firebase Storage
+      const { uploadAvatar } = await import('../../lib/userApi');
+      const uploadResult = await uploadAvatar(selectedAvatarFile, user.uid);
+      
+      // Update user profile with new avatar URL and storage path
+      await updateUserProfile(user.uid, {
+        avatarUrl: uploadResult.avatarUrl,
+        avatarStoragePath: uploadResult.avatarStoragePath,
+        avatarProvider: 'custom'
+      });
+      
+      // Only update Firebase `photoURL` if user opted in (prevents overwriting Google avatar by default)
+      if (applyToFirebase) {
+        try { 
+          await updateProfile(user, { photoURL: uploadResult.avatarUrl }); 
+        } catch (e) { 
+          console.warn('Failed to update Firebase profile photo:', e); 
         }
-      };
-      reader.readAsDataURL(selectedAvatarFile);
+      }
+      
+      // Update local preview with the uploaded avatar URL
+      setAvatarPreview(uploadResult.avatarUrl);
+      
+      toast.success('Avatar updated successfully!');
+      setIsAvatarDialogOpen(false);
+      setSelectedAvatarFile(null);
+      
+      // notify other components (Header) that profile/avatar changed
+      try { 
+        window.dispatchEvent(new CustomEvent('pfy:user-updated', { detail: { uid: user.uid } })); 
+      } catch (e) { 
+        /* ignore */ 
+      }
     } catch (error: any) {
-      console.error('Error processing avatar:', error);
-      toast.error('Failed to process avatar');
+      console.error('Error updating avatar:', error);
+      toast.error(error.message || 'Failed to update avatar');
+    } finally {
       setIsSaving(false);
     }
   };

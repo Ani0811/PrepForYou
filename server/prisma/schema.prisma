@@ -23,9 +23,54 @@ model User {
   metadata            Json      @default("{}") @db.JsonB
   isActive            Boolean   @default(true) @map("is_active")
 
+  courseProgress      CourseProgress[]
+
   @@index([email])
   @@index([firebaseUid])
   @@index([lastSignInAt])
   @@index([createdAt])
   @@map("users")
+}
+
+model Course {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title               String
+  description         String    @db.Text
+  category            String
+  duration            Int       @default(120) // Duration in minutes
+  imageUrl            String?   @map("image_url")
+  tags                String[]  @default([])
+  difficulty          String    @default("beginner") // beginner, intermediate, advanced
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  isActive            Boolean   @default(true) @map("is_active")
+
+  courseProgress      CourseProgress[]
+
+  @@index([category])
+  @@index([difficulty])
+  @@index([createdAt])
+  @@map("courses")
+}
+
+model CourseProgress {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  courseId            String    @map("course_id") @db.Uuid
+  progress            Int       @default(0) // Progress percentage (0-100)
+  status              String    @default("not-started") // not-started, in-progress, completed
+  startedAt           DateTime? @map("started_at") @db.Timestamptz
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  lastAccessedAt      DateTime  @default(now()) @map("last_accessed_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course              Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
+  @@map("course_progress")
 }

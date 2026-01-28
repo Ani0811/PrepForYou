@@ -155,17 +155,43 @@ export async function deleteUser(firebaseUid: string): Promise<void> {
 }
 
 /**
- * Upload avatar to storage (placeholder - implement with your storage solution)
- * This would typically upload to S3/GCS and return the public URL
+ * Upload avatar to Firebase Storage and return the public URL
  */
 export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
   avatarUrl: string;
   avatarStoragePath: string;
 }> {
-  // TODO: Implement actual file upload to S3/GCS/Firebase Storage
-  // For now, this is a placeholder that would:
-  // 1. Upload file to storage
-  // 2. Return public URL and storage path
-  
-  throw new Error('Avatar upload not implemented yet. Please configure S3/GCS/Firebase Storage.');
+  try {
+    const { storage } = await import('./firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+    
+    // Create a unique file name with timestamp to avoid collisions
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop() || 'jpg';
+    const fileName = `${firebaseUid}_${timestamp}.${fileExtension}`;
+    const storagePath = `avatars/${fileName}`;
+    
+    // Create a reference to the file location
+    const storageRef = ref(storage, storagePath);
+    
+    // Upload the file
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: firebaseUid,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+    
+    // Get the public download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return {
+      avatarUrl: downloadURL,
+      avatarStoragePath: storagePath,
+    };
+  } catch (error: any) {
+    console.error('Error uploading avatar:', error);
+    throw new Error(`Failed to upload avatar: ${error.message || 'Unknown error'}`);
+  }
 }

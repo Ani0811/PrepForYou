@@ -1,16 +1,71 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import { BookOpen, Clock, Award, Sparkles, Star } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import { getCoursesWithProgress, getRecommendedCourses, type CourseWithProgress } from '../../lib/courseApi';
+import { toast } from 'sonner';
 
 export default function CoursesPage() {
-  // Server-side data hooks removed for App Router conversion.
-  // Use server-provided props or data fetching in the route instead.
-  const courses: any[] = [];
-  const isLoading = false;
-  const recommendedCourses: any[] = [];
-  const isLoadingRecommended = false;
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [courses, setCourses] = useState<CourseWithProgress[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [recommendedCourses, setRecommendedCourses] = useState<CourseWithProgress[]>([]);
+  const [isLoadingRecommended, setIsLoadingRecommended] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) {
+        fetchCourses(u.uid);
+        fetchRecommendedCourses(u.uid);
+      } else {
+        setIsLoading(false);
+        setIsLoadingRecommended(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const fetchCourses = async (firebaseUid: string, category?: string) => {
+    setIsLoading(true);
+    try {
+      const data = await getCoursesWithProgress(firebaseUid, category);
+      setCourses(data);
+    } catch (error: any) {
+      console.error('Error fetching courses:', error);
+      toast.error('Failed to load courses');
+      setCourses([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchRecommendedCourses = async (firebaseUid: string) => {
+    setIsLoadingRecommended(true);
+    try {
+      const data = await getRecommendedCourses(firebaseUid);
+      setRecommendedCourses(data);
+    } catch (error: any) {
+      console.error('Error fetching recommended courses:', error);
+      setRecommendedCourses([]);
+    } finally {
+      setIsLoadingRecommended(false);
+    }
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    if (user) {
+      fetchCourses(user.uid, category === 'All' ? undefined : category);
+    }
+  };
 
   const categories = ['All', ...Array.from(new Set(courses.map(c => c.category)))];
   
@@ -19,12 +74,24 @@ export default function CoursesPage() {
     return courses.filter(c => c.category === category);
   };
 
-  const getCourseStatus = (progress: bigint) => {
-    const p = Number(progress);
-    if (p === 0) return { label: 'Not Started', variant: 'secondary' as const };
-    if (p === 100) return { label: 'Completed', variant: 'default' as const };
+  const getCourseStatus = (progress: number) => {
+    if (progress === 0) return { label: 'Not Started', variant: 'secondary' as const };
+    if (progress === 100) return { label: 'Completed', variant: 'default' as const };
     return { label: 'In Progress', variant: 'outline' as const };
   };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="backdrop-blur-sm gradient-card">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground font-sans">Please sign in to view courses</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -101,7 +168,7 @@ export default function CoursesPage() {
                   const status = getCourseStatus(course.progress);
                   return (
                     <Card
-                      key={Number(course.id)}
+                      key={course.id}
                       className="hover:shadow-gradient-lg hover:scale-105 transition-all duration-500 cursor-pointer group border-gradient relative overflow-hidden backdrop-blur-sm gradient-card"
                     >
                       <div className="absolute top-2 right-2 z-10">
@@ -132,16 +199,16 @@ export default function CoursesPage() {
                           </Badge>
                           <Badge variant="outline" className="gap-1 gradient-bg-secondary">
                             <Clock className="h-3 w-3" />
-                            ~2h
+                            {Math.round(course.duration / 60)}h
                           </Badge>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground font-sans">Progress</span>
-                            <span className="font-semibold font-display">{Number(course.progress)}%</span>
+                            <span className="font-semibold font-display">{course.progress}%</span>
                           </div>
-                          <Progress value={Number(course.progress)} className="h-2" />
+                          <Progress value={course.progress} className="h-2" />
                         </div>
                       </CardContent>
                     </Card>
@@ -154,7 +221,7 @@ export default function CoursesPage() {
       )}
 
       {/* All Courses with Category Tabs */}
-      <Tabs defaultValue="All" className="w-full">
+      <Tabs defaultValue="All" className="w-full" onValueChange={handleCategoryChange}>
         <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto gradient-bg-secondary backdrop-blur-sm">
           {categories.map((category) => (
             <TabsTrigger 
@@ -169,7 +236,23 @@ export default function CoursesPage() {
 
         {categories.map((category) => (
           <TabsContent key={category} value={category} className="mt-6">
-            {getCoursesByCategory(category).length === 0 ? (
+            {isLoading ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i} className="animate-pulse backdrop-blur-sm">
+                    <CardHeader>
+                      <div className="h-6 bg-muted rounded w-3/4" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-muted rounded" />
+                        <div className="h-4 bg-muted rounded w-5/6" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : getCoursesByCategory(category).length === 0 ? (
               <Card className="backdrop-blur-sm gradient-card">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
@@ -182,7 +265,7 @@ export default function CoursesPage() {
                   const status = getCourseStatus(course.progress);
                   return (
                     <Card
-                      key={Number(course.id)}
+                      key={course.id}
                       className="hover:shadow-gradient-lg hover:scale-105 transition-all duration-500 cursor-pointer group backdrop-blur-sm gradient-card border-gradient"
                     >
                       <CardHeader>
@@ -208,16 +291,16 @@ export default function CoursesPage() {
                           </Badge>
                           <Badge variant="outline" className="gap-1 gradient-bg-secondary">
                             <Clock className="h-3 w-3" />
-                            ~2h
+                            {Math.round(course.duration / 60)}h
                           </Badge>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground font-sans">Progress</span>
-                            <span className="font-semibold font-display">{Number(course.progress)}%</span>
+                            <span className="font-semibold font-display">{course.progress}%</span>
                           </div>
-                          <Progress value={Number(course.progress)} className="h-2" />
+                          <Progress value={course.progress} className="h-2" />
                         </div>
                       </CardContent>
                     </Card>
@@ -231,4 +314,5 @@ export default function CoursesPage() {
     </div>
   );
 }
+
 
