@@ -15,7 +15,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.13.23",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "cors": "^2.8.5",

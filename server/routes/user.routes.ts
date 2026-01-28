@@ -14,7 +14,7 @@ import { requireAdmin } from '../middleware/requireRole'
 
 const router = Router()
 
-// Public/auth routes
+// Public routes
 router.post('/', createUser)
 
 // Protected routes - require authentication
