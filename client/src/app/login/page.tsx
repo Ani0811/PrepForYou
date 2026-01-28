@@ -40,7 +40,7 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
       console.log('Login successful:', userCredential.user);
-      router.push('/profile');
+      router.push('/');
     } catch (err: any) {
       console.error('Login error:', err);
       const errorMessage = err.code === 'auth/invalid-credential' 
@@ -61,7 +61,7 @@ export default function LoginPage() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       console.log('Google sign in successful:', result.user);
-      router.push('/profile');
+      router.push('/');
     } catch (err: any) {
       console.error('Google sign in error:', err);
       const errorMessage = err.code === 'auth/popup-closed-by-user'

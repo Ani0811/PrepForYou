@@ -1,31 +1,45 @@
-import { Router } from 'express'
+import { Router } from 'express';
 import {
-  getAllUsers,
-  getUserById,
-  getCurrentUser,
-  createUser,
-  updateUser,
-  updateCurrentUser,
+  upsertUserOnSignIn,
+  getUserByFirebaseUid,
+  updateUserProfile,
   deleteUser,
-  getUserStats,
-} from '../controllers/user.controller'
-import { requireAuth, attachUserId } from '../middleware/requireAuth'
-import { requireAdmin } from '../middleware/requireRole'
+  getAllUsers,
+} from '../controllers/user.controller';
 
-const router = Router()
+const router = Router();
 
-// Public routes
-router.post('/', createUser)
+/**
+ * POST /api/users/signin
+ * Upsert user on sign-in (create or update from Firebase)
+ * Body: { firebaseUid, email, displayName?, avatarUrl?, avatarProvider? }
+ */
+router.post('/signin', upsertUserOnSignIn);
 
-// Protected routes - require authentication
-router.get('/me', requireAuth, attachUserId, getCurrentUser)
-router.put('/me', requireAuth, attachUserId, updateCurrentUser)
+/**
+ * GET /api/users/:firebaseUid
+ * Get user by Firebase UID
+ */
+router.get('/:firebaseUid', getUserByFirebaseUid);
 
-// Admin routes
-router.get('/', requireAuth, requireAdmin, getAllUsers)
-router.get('/:id', requireAuth, getUserById)
-router.get('/:id/stats', requireAuth, getUserStats)
-router.put('/:id', requireAuth, requireAdmin, updateUser)
-router.delete('/:id', requireAuth, requireAdmin, deleteUser)
+/**
+ * PATCH /api/users/:firebaseUid
+ * Update user profile (username and/or avatar)
+ * Body: { username?, avatarUrl?, avatarStoragePath?, avatarProvider? }
+ */
+router.patch('/:firebaseUid', updateUserProfile);
 
-export default router
+/**
+ * DELETE /api/users/:firebaseUid
+ * Soft delete user (set isActive to false)
+ */
+router.delete('/:firebaseUid', deleteUser);
+
+/**
+ * GET /api/users
+ * Get all users (paginated)
+ * Query params: page, limit, active
+ */
+router.get('/', getAllUsers);
+
+export default router;

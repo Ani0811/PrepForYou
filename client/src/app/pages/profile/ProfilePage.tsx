@@ -1,24 +1,178 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
-import { Mail, Target, Calendar, TrendingUp, BookOpen, Clock } from 'lucide-react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Mail, Target, Calendar, TrendingUp, BookOpen, Clock, Pencil, Camera, Check, X } from 'lucide-react';
+import { onAuthStateChanged, User as FirebaseUser, updateProfile } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import { getUserByFirebaseUid, updateUserProfile, upsertUserOnSignIn } from '../../lib/userApi';
+import { toast } from 'sonner';
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [username, setUsername] = useState('');
+  const [tempUsername, setTempUsername] = useState('');
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [applyToFirebase, setApplyToFirebase] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        try {
+          const userData = await getUserByFirebaseUid(u.uid);
+          setUsername(userData.username || u.displayName || 'No name');
+          // Show custom avatar if set, otherwise show Google provider photo
+          const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
+          const displayAvatar = userData.avatarProvider === 'custom' && userData.avatarUrl
+            ? userData.avatarUrl
+            : (providerGooglePhoto || u.photoURL || '');
+          setAvatarPreview(displayAvatar);
+          // Default behavior: if the account is using Google provider, do not overwrite provider photo
+          const providerGoogle = u.providerData?.some((p: any) => p.providerId === 'google.com');
+          setApplyToFirebase(!providerGoogle);
+        } catch (error: any) {
+          const msg = error?.message ?? String(error);
+          // If user not found on backend, create it (upsert) using Firebase info
+          if (msg.includes('404') || msg.toLowerCase().includes('user not found')) {
+            try {
+              const payload = {
+                firebaseUid: u.uid,
+                email: u.email ?? '',
+                displayName: u.displayName ?? '',
+                avatarUrl: u.photoURL ?? '',
+              };
+              const created = await upsertUserOnSignIn(payload);
+              setUsername(created.username || created.displayName || u.displayName || 'No name');
+              const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
+              setAvatarPreview(providerGooglePhoto || u.photoURL || '');
+              const providerGoogle = u.providerData?.some((p: any) => p.providerId === 'google.com');
+              setApplyToFirebase(!providerGoogle);
+            } catch (createErr) {
+              console.warn('Failed to create user on sign-in:', createErr);
+              setUsername(u.displayName || 'No name');
+              setAvatarPreview(u.photoURL || '');
+            }
+          } else {
+            console.warn('Error fetching user data:', error);
+            setUsername(u.displayName || 'No name');
+            setAvatarPreview(u.photoURL || '');
+          }
+        }
+      }
       setLoading(false);
     });
     return () => unsub();
   }, []);
+
+  const handleUsernameEdit = () => {
+    setTempUsername(username);
+    setIsEditingUsername(true);
+  };
+
+  const handleUsernameSave = async () => {
+    if (!user || !tempUsername.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      await updateUserProfile(user.uid, { username: tempUsername.trim() });
+      await updateProfile(user, { displayName: tempUsername.trim() });
+      setUsername(tempUsername.trim());
+      setIsEditingUsername(false);
+      toast.success('Username updated successfully!');
+      // notify other components (Header) that profile changed
+      try { window.dispatchEvent(new CustomEvent('pfy:user-updated', { detail: { uid: user.uid } })); } catch (e) { /* ignore */ }
+    } catch (error: any) {
+      console.error('Error updating username:', error);
+      toast.error(error.message || 'Failed to update username');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUsernameCancel = () => {
+    setTempUsername('');
+    setIsEditingUsername(false);
+  };
+
+  const handleAvatarClick = () => {
+    setIsAvatarDialogOpen(true);
+  };
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      setSelectedAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarSave = async () => {
+    if (!user || !selectedAvatarFile) return;
+    
+    setIsSaving(true);
+    try {
+      // For now, we'll use a data URL. In production, you'd upload to cloud storage
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const dataUrl = reader.result as string;
+        try {
+          await updateUserProfile(user.uid, {
+            avatarUrl: dataUrl,
+            avatarProvider: 'custom'
+          });
+          // Only update Firebase `photoURL` if user opted in (prevents overwriting Google avatar by default)
+          if (applyToFirebase) {
+            try { await updateProfile(user, { photoURL: dataUrl }); } catch (e) { console.warn('Failed to update Firebase profile photo:', e); }
+          }
+          toast.success('Avatar updated successfully!');
+          setIsAvatarDialogOpen(false);
+          setSelectedAvatarFile(null);
+          // notify other components (Header) that profile/avatar changed
+          try { window.dispatchEvent(new CustomEvent('pfy:user-updated', { detail: { uid: user.uid } })); } catch (e) { /* ignore */ }
+        } catch (error: any) {
+          console.error('Error updating avatar:', error);
+          toast.error(error.message || 'Failed to update avatar');
+        } finally {
+          setIsSaving(false);
+        }
+      };
+      reader.readAsDataURL(selectedAvatarFile);
+    } catch (error: any) {
+      console.error('Error processing avatar:', error);
+      toast.error('Failed to process avatar');
+      setIsSaving(false);
+    }
+  };
+
+  const handleAvatarCancel = () => {
+    setIsAvatarDialogOpen(false);
+    setSelectedAvatarFile(null);
+    setAvatarPreview(user?.photoURL || '');
+  };
 
   if (loading) {
     return (
@@ -38,11 +192,18 @@ export default function ProfilePage() {
 
   const userProfile = {
     id: user.uid,
-    name: user.displayName ?? 'No name',
+    name: username,
     email: user.email ?? '',
-    avatarUrl: user.photoURL ?? '',
+    avatarUrl: avatarPreview,
     learningGoals: 'Not set yet'
   };
+
+  const initials = username
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   const stats = {
     totalCourses: 0,
@@ -50,13 +211,6 @@ export default function ProfilePage() {
     learningStreak: 0,
     totalTimeSpent: 0
   };
-
-  const initials = userProfile.name
-    .split(' ')
-    .map((n: string) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <div className="space-y-6">
@@ -75,13 +229,75 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col items-center text-center">
-              <Avatar className="h-24 w-24 mb-4 ring-2 ring-gradient-start transition-all duration-300 hover:scale-110">
-                <AvatarImage src={userProfile.avatarUrl} alt={userProfile.name} />
-                <AvatarFallback className="text-2xl font-display gradient-bg-primary text-primary-foreground">{initials}</AvatarFallback>
-              </Avatar>
-              <h2 className="text-2xl font-display font-bold">{userProfile.name}</h2>
-              <Badge variant="secondary" className="mt-2 gradient-bg-secondary">Active Learner</Badge>
-            </div>
+              <div className="relative group">
+                <Avatar 
+                  className="h-24 w-24 mb-4 ring-2 ring-gradient-start transition-all duration-300 hover:scale-110 cursor-pointer"
+                  onClick={handleAvatarClick}
+                >
+                  <AvatarImage src={userProfile.avatarUrl} alt={userProfile.name} />
+                  <AvatarFallback className="text-2xl font-display gradient-bg-primary text-primary-foreground">{initials}</AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={handleAvatarClick}
+                  className="absolute bottom-4 right-0 p-2 rounded-full bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:scale-110 transition-transform duration-200"
+                  aria-label="Change avatar"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-2 mb-2">
+                {isEditingUsername ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={tempUsername}
+                      onChange={(e) => setTempUsername(e.target.value)}
+                      className="h-8 text-center font-display"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleUsernameSave();
+                        if (e.key === 'Escape') handleUsernameCancel();
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleUsernameSave}
+                      disabled={isSaving}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Check className="h-4 w-4 text-green-500" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleUsernameCancel}
+                      disabled={isSaving}
+                      className="h-8 w-8 p-0"
+                    >
+                      <X className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-display font-bold">{userProfile.name}</h2>
+                    <button
+                      onClick={handleUsernameEdit}
+                      className="p-1 rounded hover:bg-accent transition-colors"
+                      aria-label="Edit username"
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                    <button
+                      onClick={handleAvatarClick}
+                      className="absolute bottom-4 right-0 p-2 rounded-full bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:scale-110 hover:-translate-y-1 hover:shadow-2xl transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-400"
+                      aria-label="Change avatar"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
 
             <div className="space-y-4 pt-4 border-t">
               {userProfile.email && (
@@ -112,6 +328,7 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+          </div>
           </CardContent>
         </Card>
 
@@ -168,16 +385,74 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-
-            <div className="mt-6 p-4 rounded-lg gradient-bg-secondary">
-              <h3 className="font-semibold mb-2 font-display">Account ID</h3>
-                <p className="text-xs text-muted-foreground font-mono break-all">
-                  {userProfile?.id ? String(userProfile.id) : 'Not available'}
-                </p>
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Avatar Edit Dialog */}
+      <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+        <DialogContent className="sm:max-w-md backdrop-blur-sm" style={{ backgroundColor: 'rgba(8,8,10,0.98)' }}>
+          <DialogHeader>
+            <DialogTitle className="font-display">Change Avatar</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-col items-center gap-4">
+              <Avatar className="h-32 w-32 ring-2 ring-gradient-start">
+                <AvatarImage src={avatarPreview} alt="Preview" />
+                <AvatarFallback className="text-4xl font-display gradient-bg-primary text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileSelect}
+                className="hidden"
+              />
+              
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Choose Image
+              </Button>
+              
+              <p className="text-sm text-muted-foreground text-center">
+                Select an image (max 5MB)
+              </p>
+              <label className="flex items-center gap-2 mt-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={applyToFirebase}
+                  onChange={(e) => setApplyToFirebase(e.target.checked)}
+                />
+                <span className="text-sm">Apply as account photo (replace provider avatar)</span>
+              </label>
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={handleAvatarCancel}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAvatarSave}
+                disabled={!selectedAvatarFile || isSaving}
+                className="gradient-bg-primary"
+              >
+                {isSaving ? 'Saving...' : 'Save Avatar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Preferences Card */}
       <Card className="gradient-card border-gradient backdrop-blur-sm hover:shadow-gradient-md transition-all duration-500">

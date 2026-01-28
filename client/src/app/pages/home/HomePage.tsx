@@ -1,12 +1,25 @@
-// Hook imports removed for App Router conversion; use server-side data instead.
+"use client";
+
+// Hook imports removed for App Router conversion; use client-side auth for name display.
+import { useState, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import { CheckCircle2, Circle, BookOpen, Clock, Target, TrendingUp } from 'lucide-react';
 
 export default function HomePage() {
-  // Server-provided data placeholders (replace with real server fetching)
-  const userProfile: any = undefined;
+  // Client-side user profile (populated from Firebase auth)
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) setUserProfile({ name: u.displayName, email: u.email });
+      else setUserProfile(null);
+    });
+    return () => unsub();
+  }, []);
   const tasks: any[] = [];
   const courses: any[] = [];
   const stats: any = undefined;
@@ -18,7 +31,7 @@ export default function HomePage() {
     <div className="space-y-8">
       {/* Welcome Section */}
       <div className="space-y-2">
-        <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight gradient-text transition-all duration-300">
+        <h1 className="text-5xl md:text-6xl font-display font-bold tracking-tight gradient-text transition-all duration-300">
           Welcome back, {userProfile?.name || 'Student'}! 👋
         </h1>
         <p className="text-muted-foreground text-lg font-sans">

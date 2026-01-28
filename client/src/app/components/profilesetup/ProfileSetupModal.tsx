@@ -6,12 +6,16 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 
 interface ProfileSetupModalProps {
+  open: boolean;
+  initialName?: string;
+  initialEmail?: string;
+  lockEmail?: boolean;
   onComplete: () => void;
 }
 
-export default function ProfileSetupModal({ onComplete }: ProfileSetupModalProps) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+export default function ProfileSetupModal({ open, initialName = '', initialEmail = '', lockEmail = false, onComplete }: ProfileSetupModalProps) {
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -32,7 +36,7 @@ export default function ProfileSetupModal({ onComplete }: ProfileSetupModalProps
   };
 
   return (
-    <Dialog open={true}>
+    <Dialog open={open}>
       <DialogContent className="sm:max-w-md" onPointerDownOutside={(e: Event) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="font-display gradient-text">Welcome to PrepForYou!</DialogTitle>
@@ -65,7 +69,10 @@ export default function ProfileSetupModal({ onComplete }: ProfileSetupModalProps
               placeholder="Enter your email"
               className="font-sans"
               required
+              readOnly={lockEmail}
+              disabled={lockEmail}
             />
+            {lockEmail && <p className="text-xs text-muted-foreground">Email is linked to your account and cannot be changed here.</p>}
           </div>
 
           <Button

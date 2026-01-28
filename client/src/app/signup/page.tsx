@@ -52,7 +52,7 @@ export default function SignUpPage() {
       });
       
       console.log('Signup successful:', userCredential.user);
-      router.push('/profile');
+      router.push('/');
     } catch (err: any) {
       console.error('Signup error:', err);
       const errorMessage = err.code === 'auth/email-already-in-use'
@@ -71,7 +71,7 @@ export default function SignUpPage() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       console.log('Google sign up successful:', result.user);
-      router.push('/profile');
+      router.push('/');
     } catch (err: any) {
       console.error('Google sign up error:', err);
       const errorMessage = err.code === 'auth/popup-closed-by-user'

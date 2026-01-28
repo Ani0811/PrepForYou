@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
 import Header from "./components/header/Header";
 import Footer from "./components/footer/Footer";
 import ThreeBackground from "./components/background/ThreeBackground";
@@ -37,12 +38,13 @@ export default function RootLayout({
             
             <Header />
             
-            <main className="flex-1 container mx-auto px-4 py-8 relative z-10">
+            <main className="flex-1 container mx-auto px-4 py-8 relative z-10 pt-24">
               {children}
             </main>
 
             <Footer />
           </div>
+          <Toaster position="top-center" richColors />
         </ThemeProvider>
       </body>
     </html>

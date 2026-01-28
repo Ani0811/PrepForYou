@@ -5,12 +5,6 @@ import prisma from './db/prisma'
 
 // Import routes
 import userRoutes from './routes/user.routes'
-import subjectRoutes from './routes/subject.routes'
-import topicRoutes from './routes/topic.routes'
-import materialRoutes from './routes/material.routes'
-import reflectionRoutes from './routes/reflection.routes'
-import reviewRoutes from './routes/review.routes'
-import aiOutputRoutes from './routes/aiOutput.routes'
 
 // Load environment variables
 dotenv.config()
@@ -33,18 +27,6 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API routes
 app.use('/api/users', userRoutes)
-app.use('/api/subjects', subjectRoutes)
-app.use('/api/topics', topicRoutes)
-app.use('/api/materials', materialRoutes)
-
-// Reflection routes with rules enforcement
-app.use('/api/reflections', reflectionRoutes)
-
-// Review routes with interval enforcement
-app.use('/api/reviews', reviewRoutes)
-
-// AI output routes
-app.use('/api/ai-outputs', aiOutputRoutes)
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {
@@ -65,16 +47,6 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🔗 API available at http://localhost:${PORT}`)
-
-  // Temporary sanity check: log users
-  ;(async () => {
-    try {
-      const users = await prisma.users.findMany()
-      console.log('Prisma sanity check - users:', users)
-    } catch (err) {
-      console.error('Prisma sanity check failed:', err)
-    }
-  })()
 })
 
 export default app

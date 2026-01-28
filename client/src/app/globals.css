@@ -95,6 +95,7 @@
     body {
         background: oklch(var(--background));
         color: oklch(var(--foreground));
+        font-size: 18px;
         font-family: 'Crimson Pro', Georgia, 'Times New Roman', serif;
         font-weight: 400;
         transition: font-weight 0.3s ease, color 0.3s ease;

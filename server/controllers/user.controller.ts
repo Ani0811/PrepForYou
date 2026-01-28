@@ -1,167 +1,204 @@
-import { Request, Response } from 'express'
-import { prisma } from '../db/prisma'
+import { Request, Response } from 'express';
+import prisma from '../db/prisma';
 
-export const getAllUsers = async (req: Request, res: Response) => {
+/**
+ * Upsert user on sign-in (create or update from Firebase)
+ * POST /api/users/signin
+ * Body: { firebaseUid, email, displayName?, avatarUrl?, avatarProvider? }
+ */
+export const upsertUserOnSignIn = async (req: Request, res: Response) => {
   try {
-    const users = await prisma.users.findMany({
-      include: {
-        subjects: true,
-        reflections: true,
-        reviews: true,
-      },
-    })
-    res.json(users)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch users' })
-  }
-}
+    const { firebaseUid, email, displayName, avatarUrl, avatarProvider } = req.body;
 
-export const getUserById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const user = await prisma.users.findUnique({
-      where: { id: id as string },
-      include: {
-        subjects: true,
-        reflections: true,
-        reviews: true,
-      },
-    })
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    if (!firebaseUid || !email) {
+      return res.status(400).json({ error: 'firebaseUid and email are required' });
     }
-    
-    res.json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch user' })
-  }
-}
 
-export const getCurrentUser = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).userId
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-    
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      include: {
-        subjects: true,
-        reflections: true,
-        reviews: true,
-      },
-    })
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
-    }
-    
-    res.json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch current user' })
-  }
-}
-
-export const createUser = async (req: Request, res: Response) => {
-  try {
-    const { id, clerk_user_id, email, name, role } = req.body
-    
-    // Check if user already exists
-    const existingUser = await prisma.users.findUnique({
-      where: { id },
-    })
-    
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' })
-    }
-    
-    const user = await prisma.users.create({
-      data: {
-        id,
-        clerk_user_id: clerk_user_id || id,
+    const user = await prisma.user.upsert({
+      where: { firebaseUid },
+      update: {
         email,
-        name,
-        role: role || 'user',
+        displayName: displayName || undefined,
+        avatarUrl: avatarUrl || undefined,
+        avatarProvider: avatarProvider || undefined,
+        lastSignInAt: new Date(),
+        signInCount: {
+          increment: 1,
+        },
       },
-    })
-    
-    res.status(201).json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create user' })
-  }
-}
+      create: {
+        firebaseUid,
+        email,
+        displayName: displayName || null,
+        avatarUrl: avatarUrl || null,
+        avatarProvider: avatarProvider || 'google',
+        emailVerified: false,
+        lastSignInAt: new Date(),
+        signInCount: 1,
+      },
+    });
 
-export const updateUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const { email, name, role } = req.body
-    
-    const user = await prisma.users.update({
-      where: { id: id as string },
-      data: { email, name, role },
-    })
-    
-    res.json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update user' })
+    return res.status(200).json({ success: true, user });
+  } catch (error: any) {
+    console.error('Error upserting user on sign-in:', error);
+    return res.status(500).json({ error: 'Failed to upsert user', details: error.message });
   }
-}
+};
 
-export const updateCurrentUser = async (req: Request, res: Response) => {
+/**
+ * Get user by Firebase UID
+ * GET /api/users/:firebaseUid
+ */
+export const getUserByFirebaseUid = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId
-    
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' })
+    const firebaseUidParam = req.params.firebaseUid;
+    const firebaseUid = Array.isArray(firebaseUidParam) ? firebaseUidParam[0] : firebaseUidParam;
+
+    if (!firebaseUid) {
+      return res.status(400).json({ error: 'firebaseUid is required' });
     }
-    
-    const { email, name } = req.body
-    
-    const user = await prisma.users.update({
-      where: { id: userId },
-      data: { email, name },
-    })
-    
-    res.json(user)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update user' })
-  }
-}
 
+    const user = await prisma.user.findUnique({
+      where: { firebaseUid },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.status(200).json({ success: true, user });
+  } catch (error: any) {
+    console.error('Error fetching user:', error);
+    return res.status(500).json({ error: 'Failed to fetch user', details: error.message });
+  }
+};
+
+/**
+ * Update user profile (username and/or avatar)
+ * PATCH /api/users/:firebaseUid
+ * Body: { username?, avatarUrl?, avatarStoragePath?, avatarProvider? }
+ */
+export const updateUserProfile = async (req: Request, res: Response) => {
+  try {
+    const firebaseUidParam = req.params.firebaseUid;
+    const firebaseUid = Array.isArray(firebaseUidParam) ? firebaseUidParam[0] : firebaseUidParam;
+    const { username, avatarUrl, avatarStoragePath, avatarProvider } = req.body;
+
+    if (!firebaseUid) {
+      return res.status(400).json({ error: 'firebaseUid is required' });
+    }
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { firebaseUid },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check username uniqueness if provided
+    if (username) {
+      const usernameExists = await prisma.user.findFirst({
+        where: {
+          username: {
+            equals: username,
+            mode: 'insensitive',
+          },
+          firebaseUid: {
+            not: firebaseUid,
+          },
+        },
+      });
+
+      if (usernameExists) {
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+    }
+
+    // Update user
+    const updatedUser = await prisma.user.update({
+      where: { firebaseUid },
+      data: {
+        ...(username !== undefined && { username }),
+        ...(avatarUrl !== undefined && { avatarUrl }),
+        ...(avatarStoragePath !== undefined && { avatarStoragePath }),
+        ...(avatarProvider !== undefined && { avatarProvider }),
+      },
+    });
+
+    return res.status(200).json({ success: true, user: updatedUser });
+  } catch (error: any) {
+    console.error('Error updating user profile:', error);
+    return res.status(500).json({
+      error: 'Failed to update user profile',
+      details: error?.message || String(error),
+      code: error?.code || null,
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+    });
+  }
+};
+
+/**
+ * Delete user (soft delete by setting isActive to false)
+ * DELETE /api/users/:firebaseUid
+ */
 export const deleteUser = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    await prisma.users.delete({
-      where: { id: id as string },
-    })
-    res.status(204).send()
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete user' })
-  }
-}
+    const firebaseUidParam = req.params.firebaseUid;
+    const firebaseUid = Array.isArray(firebaseUidParam) ? firebaseUidParam[0] : firebaseUidParam;
 
-export const getUserStats = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const userId = id as string
-    
-    const [reflectionsCount, reviewsCount, subjectsCount] = await Promise.all([
-      prisma.reflections.count({ where: { user_id: userId } }),
-      prisma.reviews.count({ where: { user_id: userId } }),
-      prisma.subjects.count({ where: { user_id: userId } }),
-    ])
-    
-    const stats = {
-      reflectionsCount,
-      reviewsCount,
-      subjectsCount,
+    if (!firebaseUid) {
+      return res.status(400).json({ error: 'firebaseUid is required' });
     }
-    
-    res.json(stats)
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch user stats' })
+
+    const user = await prisma.user.update({
+      where: { firebaseUid },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return res.status(200).json({ success: true, message: 'User deactivated', user });
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    return res.status(500).json({ error: 'Failed to delete user', details: error.message });
   }
-}
+};
+
+/**
+ * Get all users (admin only - add auth middleware as needed)
+ * GET /api/users
+ */
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10, active = 'true' } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where = active === 'true' ? { isActive: true } : {};
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      users,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    return res.status(500).json({ error: 'Failed to fetch users', details: error.message });
+  }
+};
