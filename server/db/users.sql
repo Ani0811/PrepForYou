@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS users (
   is_active boolean DEFAULT true
 );
 
+-- Add column 'role' for user authorization: 'owner', 'admin' or 'user'
+ALTER TABLE users
+ADD COLUMN role text DEFAULT 'user'
+CHECK (role IN ('owner', 'admin', 'user'));
+
+
 -- Case-insensitive unique username index
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_idx 
   ON users (lower(username)) 

@@ -35,6 +35,7 @@ export interface User {
   updatedAt: string;
   metadata: Record<string, any>;
   isActive: boolean;
+  role: string;
 }
 
 export interface UpsertUserPayload {
@@ -162,7 +163,7 @@ export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
   avatarStoragePath: string;
 }> {
   try {
-    const { storage } = await import('./firebase');
+    const { storage } = await import('../lib/firebase');
     const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
     
     // Create a unique file name with timestamp to avoid collisions
@@ -194,4 +195,180 @@ export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
     console.error('Error uploading avatar:', error);
     throw new Error(`Failed to upload avatar: ${error.message || 'Unknown error'}`);
   }
+}
+
+/**
+ * Get paginated users (admin only)
+ */
+export async function getUsers(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<{ users: User[]; pagination: any }> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.append('page', params.page.toString());
+  if (params?.limit) searchParams.append('limit', params.limit.toString());
+
+  const url = `${API_URL}/admin/users${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to fetch users';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return { users: data.users, pagination: data.pagination };
+}
+
+/**
+ * Create new user (admin only)
+ */
+export async function createUser(payload: {
+  email: string;
+  displayName?: string;
+  username?: string;
+  role?: string;
+}): Promise<User> {
+  const url = `${API_URL}/admin/users`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to create user';
+    const errMsg = `${response.status} ${response.statusText} - ${msg} (url: ${url})`;
+    console.error('API error:', { url, status: response.status, statusText: response.statusText, body });
+    // include details in thrown error to help debugging (shows url and status)
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.user;
+}
+
+/**
+ * Update user details (admin only)
+ */
+export async function updateUserDetails(userId: string, payload: {
+  displayName?: string;
+  username?: string;
+  email?: string;
+}): Promise<User> {
+  const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to update user';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/admin/users/${userId}`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.user;
+}
+
+/**
+ * Delete user by ID (admin only)
+ */
+export async function deleteUserById(userId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to delete user';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/admin/users/${userId}`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+}
+
+/**
+ * Update user role (admin only)
+ */
+export async function updateUserRole(userId: string, role: string): Promise<User> {
+  // use admin-scoped role endpoint for admin UI actions
+  const url = `${API_URL}/admin/users/${userId}/role`;
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ role }),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to update role';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url, status: response.status, statusText: response.statusText, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.user;
+}
+
+/**
+ * Report user (admin only)
+ */
+export async function reportUser(userId: string, payload: {
+  reason: string;
+  details?: string;
+}): Promise<{ reportId: string }> {
+  const response = await fetch(`${API_URL}/admin/users/${userId}/report`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to report user';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/admin/users/${userId}/report`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return { reportId: data.reportId };
 }

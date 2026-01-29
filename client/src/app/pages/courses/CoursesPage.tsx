@@ -8,7 +8,7 @@ import { BookOpen, Clock, Award, Sparkles, Star } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getCoursesWithProgress, getRecommendedCourses, type CourseWithProgress } from '../../lib/courseApi';
+import { getCoursesWithProgress, getRecommendedCourses, type CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
 
 export default function CoursesPage() {

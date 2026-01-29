@@ -22,6 +22,7 @@ model User {
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   metadata            Json      @default("{}") @db.JsonB
   isActive            Boolean   @default(true) @map("is_active")
+  role                String    @default("user") // owner, admin, user
 
   courseProgress      CourseProgress[]
 
@@ -29,6 +30,7 @@ model User {
   @@index([firebaseUid])
   @@index([lastSignInAt])
   @@index([createdAt])
+  @@index([role])
   @@map("users")
 }
 
@@ -41,6 +43,8 @@ model Course {
   imageUrl            String?   @map("image_url")
   tags                String[]  @default([])
   difficulty          String    @default("beginner") // beginner, intermediate, advanced
+  enrollmentCount     Int       @default(0) @map("enrollment_count") // Cached enrollment count
+  isPublished         Boolean   @default(false) @map("is_published") // Whether course is published
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   isActive            Boolean   @default(true) @map("is_active")
@@ -50,6 +54,7 @@ model Course {
   @@index([category])
   @@index([difficulty])
   @@index([createdAt])
+  @@index([isPublished])
   @@map("courses")
 }
 

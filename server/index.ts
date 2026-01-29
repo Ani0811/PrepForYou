@@ -6,6 +6,7 @@ import prisma from './db/prisma'
 // Import routes
 import userRoutes from './routes/user.routes'
 import courseRoutes from './routes/course.routes'
+import adminRoutes from './routes/admin.routes'
 
 // Load environment variables
 dotenv.config()
@@ -29,6 +30,7 @@ app.get('/health', (req: Request, res: Response) => {
 // API routes
 app.use('/api/users', userRoutes)
 app.use('/api/courses', courseRoutes)
+app.use('/api/admin', adminRoutes)
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

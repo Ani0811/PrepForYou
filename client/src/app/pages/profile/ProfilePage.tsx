@@ -6,16 +6,17 @@ import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar'
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Mail, Target, Calendar, TrendingUp, BookOpen, Clock, Pencil, Camera, Check, X } from 'lucide-react';
-import { onAuthStateChanged, User as FirebaseUser, updateProfile } from 'firebase/auth';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
+import { Mail, Target, Calendar, TrendingUp, BookOpen, Clock, Pencil, Camera, Check, X, Shield, AlertTriangle, Trash2 } from 'lucide-react';
+import { onAuthStateChanged, User as FirebaseUser, updateProfile, GoogleAuthProvider, reauthenticateWithPopup, deleteUser as deleteFirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getUserByFirebaseUid, updateUserProfile, upsertUserOnSignIn } from '../../lib/userApi';
+import { getUserByFirebaseUid, updateUserProfile, upsertUserOnSignIn, deleteUser, User as BackendUser } from '../../api/userApi';
 import { toast } from 'sonner';
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [username, setUsername] = useState('');
   const [tempUsername, setTempUsername] = useState('');
@@ -25,6 +26,9 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [applyToFirebase, setApplyToFirebase] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -32,6 +36,7 @@ export default function ProfilePage() {
       if (u) {
         try {
           const userData = await getUserByFirebaseUid(u.uid);
+          setBackendUser(userData);
           setUsername(userData.username || u.displayName || 'No name');
           // Show custom avatar if set, otherwise show Google provider photo
           const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
@@ -54,6 +59,7 @@ export default function ProfilePage() {
                 avatarUrl: u.photoURL ?? '',
               };
               const created = await upsertUserOnSignIn(payload);
+              setBackendUser(created);
               setUsername(created.username || created.displayName || u.displayName || 'No name');
               const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
               setAvatarPreview(providerGooglePhoto || u.photoURL || '');
@@ -61,11 +67,13 @@ export default function ProfilePage() {
               setApplyToFirebase(!providerGoogle);
             } catch (createErr) {
               console.warn('Failed to create user on sign-in:', createErr);
+              setBackendUser(null);
               setUsername(u.displayName || 'No name');
               setAvatarPreview(u.photoURL || '');
             }
           } else {
             console.warn('Error fetching user data:', error);
+            setBackendUser(null);
             setUsername(u.displayName || 'No name');
             setAvatarPreview(u.photoURL || '');
           }
@@ -136,7 +144,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       // Upload avatar to Firebase Storage
-      const { uploadAvatar } = await import('../../lib/userApi');
+      const { uploadAvatar } = await import('../../api/userApi');
       const uploadResult = await uploadAvatar(selectedAvatarFile, user.uid);
       
       // Update user profile with new avatar URL and storage path
@@ -180,6 +188,55 @@ export default function ProfilePage() {
     setIsAvatarDialogOpen(false);
     setSelectedAvatarFile(null);
     setAvatarPreview(user?.photoURL || '');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || deleteConfirmText !== 'DELETE') return;
+    
+    setIsDeleting(true);
+    try {
+      // Step 1: Check if user is owner (prevent deletion)
+      if (backendUser?.role === 'owner') {
+        toast.error('Owner accounts cannot be deleted. Please transfer ownership first.');
+        setIsDeleting(false);
+        return;
+      }
+
+      // Step 2: Soft-delete the user in backend database
+      await deleteUser(user.uid);
+      toast.success('Account deactivated in database');
+
+      // Step 3: Attempt to delete Firebase Auth account (requires recent login)
+      try {
+        // Check if user logged in with Google
+        const isGoogleUser = user.providerData?.some((p: any) => p.providerId === 'google.com');
+        
+        if (isGoogleUser) {
+          // Reauthenticate with Google popup
+          const provider = new GoogleAuthProvider();
+          await reauthenticateWithPopup(user, provider);
+        }
+        
+        // Delete Firebase Auth account
+        await deleteFirebaseUser(user);
+        toast.success('Account deleted successfully');
+      } catch (authError: any) {
+        // If auth deletion fails (stale credentials), just log out
+        console.warn('Firebase Auth deletion failed (may require manual cleanup):', authError);
+        if (authError.code === 'auth/requires-recent-login') {
+          toast.warning('Account deactivated. Please sign in again to complete full deletion.');
+        }
+      }
+
+      // Step 4: Sign out and redirect
+      await auth.signOut();
+      setIsDeleteDialogOpen(false);
+      window.location.href = '/';
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast.error(error.message || 'Failed to delete account');
+      setIsDeleting(false);
+    }
   };
 
   if (loading) {
@@ -296,18 +353,26 @@ export default function ProfilePage() {
                     >
                       <Pencil className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </button>
-                    <button
-                      onClick={handleAvatarClick}
-                      className="absolute bottom-4 right-0 p-2 rounded-full bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-lg hover:scale-110 hover:-translate-y-1 hover:shadow-2xl transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-400"
-                      aria-label="Change avatar"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </button>
+                    
                   </>
                 )}
               </div>
 
             <div className="space-y-4 pt-4 border-t">
+              {backendUser?.role && (backendUser.role === 'owner' || backendUser.role === 'admin') && (
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium font-display">Role</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm px-3 py-1 rounded-full bg-linear-to-r from-amber-500 to-orange-500 text-white font-semibold shadow-sm">
+                        {backendUser.role === 'owner' ? 'Owner' : 'Admin'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {userProfile.email && (
                 <div className="flex items-start gap-3">
                   <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -495,6 +560,102 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone Card */}
+      <Card className="border-red-500/50 bg-red-950/10 backdrop-blur-sm hover:shadow-red-500/20 transition-all duration-500">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <CardTitle className="font-display text-red-500">Danger Zone</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg border border-red-500/30 bg-red-950/20">
+              <div className="flex-1">
+                <p className="font-medium font-display text-red-400">Delete Account</p>
+                <p className="text-sm text-muted-foreground font-sans mt-1">
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                disabled={backendUser?.role === 'owner'}
+                className="ml-4 bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Account
+              </Button>
+            </div>
+            {backendUser?.role === 'owner' && (
+              <p className="text-xs text-red-400 font-sans">
+                Owner accounts cannot be deleted. Please transfer ownership to another admin first.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md backdrop-blur-sm" style={{ backgroundColor: 'rgba(8,8,10,0.98)' }}>
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-red-500" />
+              <DialogTitle className="font-display text-red-500">Delete Account</DialogTitle>
+            </div>
+            <DialogDescription className="text-muted-foreground">
+              This action is permanent and cannot be undone. All your data will be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <p className="text-sm font-sans text-muted-foreground">
+                The following will be permanently deleted:
+              </p>
+              <ul className="text-sm font-sans text-muted-foreground space-y-1 ml-4">
+                <li>• Your profile and account information</li>
+                <li>• All course progress and enrollments</li>
+                <li>• Custom avatar and uploaded files</li>
+                <li>• Learning statistics and achievements</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-sans font-medium">
+                Type <span className="font-mono text-red-500 font-bold">DELETE</span> to confirm:
+              </p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="font-mono"
+                disabled={isDeleting}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setDeleteConfirmText('');
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete My Account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

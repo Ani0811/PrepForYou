@@ -5,6 +5,7 @@ import {
   updateUserProfile,
   deleteUser,
   getAllUsers,
+  updateUserRole,
 } from '../controllers/user.controller';
 
 const router = Router();
@@ -41,5 +42,12 @@ router.delete('/:firebaseUid', deleteUser);
  * Query params: page, limit, active
  */
 router.get('/', getAllUsers);
+
+/**
+ * PATCH /api/users/:userId/role
+ * Update user role (admin/owner only)
+ * Body: { role: 'user' | 'admin' | 'owner' }
+ */
+router.patch('/:userId/role', updateUserRole);
 
 export default router;

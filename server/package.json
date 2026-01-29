@@ -2,7 +2,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "ts-node index.ts",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "promote:first-user": "ts-node scripts/promote-first-user.ts"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

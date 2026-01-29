@@ -14,6 +14,15 @@ export const upsertUserOnSignIn = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'firebaseUid and email are required' });
     }
 
+    // Check if this is the first active user (will become owner)
+    const activeUserCount = await prisma.user.count({ where: { isActive: true } });
+    const isFirstUser = activeUserCount === 0;
+
+    // Check if user exists (including soft-deleted)
+    const existingUser = await prisma.user.findUnique({
+      where: { firebaseUid },
+    });
+
     const user = await prisma.user.upsert({
       where: { firebaseUid },
       update: {
@@ -25,6 +34,10 @@ export const upsertUserOnSignIn = async (req: Request, res: Response) => {
         signInCount: {
           increment: 1,
         },
+        // Reactivate if soft-deleted
+        isActive: true,
+        // If user was deleted and they're now the first active user, promote to owner
+        ...(existingUser && !existingUser.isActive && isFirstUser ? { role: 'owner' } : {}),
       },
       create: {
         firebaseUid,
@@ -35,6 +48,7 @@ export const upsertUserOnSignIn = async (req: Request, res: Response) => {
         emailVerified: false,
         lastSignInAt: new Date(),
         signInCount: 1,
+        role: isFirstUser ? 'owner' : 'user',
       },
     });
 
@@ -200,5 +214,51 @@ export const getAllUsers = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching users:', error);
     return res.status(500).json({ error: 'Failed to fetch users', details: error.message });
+  }
+};
+
+/**
+ * Update user role (admin/owner only)
+ * PATCH /api/users/:userId/role
+ */
+export const updateUserRole = async (req: Request, res: Response) => {
+  try {
+    const userIdParam = req.params.userId;
+    const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
+    const { role } = req.body;
+
+    if (!userId || !role) {
+      return res.status(400).json({ error: 'userId and role are required' });
+    }
+
+    // Validate role
+    if (!['user', 'admin', 'owner'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be user, admin, or owner' });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent changing owner role
+    if (user.role === 'owner') {
+      return res.status(403).json({ error: 'Cannot modify owner role' });
+    }
+
+    // Update role
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    });
+
+    return res.status(200).json({ success: true, user: updatedUser });
+  } catch (error: any) {
+    console.error('Error updating user role:', error);
+    return res.status(500).json({ error: 'Failed to update user role', details: error.message });
   }
 };

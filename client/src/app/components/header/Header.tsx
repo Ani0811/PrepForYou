@@ -13,12 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Home, BookOpen, TrendingUp, User, LogIn, UserPlus, LogOut } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, User, LogIn, UserPlus, LogOut, Shield } from 'lucide-react';
 import ThemeSwitcher from '../theme/ThemeSwitcher';
 import ProfileSetupModal from '../profilesetup/ProfileSetupModal';
 import { auth } from '../../lib/firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { upsertUserOnSignIn, getUserByFirebaseUid } from '../../lib/userApi';
+import { upsertUserOnSignIn, getUserByFirebaseUid, User as BackendUser } from '../../api/userApi';
 
 export default function Header() {
   const router = useRouter();
@@ -28,6 +28,7 @@ export default function Header() {
   const [imageFailed, setImageFailed] = useState(false);
   const [backendAvatarUrl, setBackendAvatarUrl] = useState<string | null>(null);
   const [backendAvatarProvider, setBackendAvatarProvider] = useState<string | null>(null);
+  const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   
   // Avatar selection logic: if user set custom avatar, use it; otherwise use Google provider photo
   const providerGooglePhoto = currentUser?.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
@@ -35,16 +36,7 @@ export default function Header() {
     ? backendAvatarUrl 
     : (providerGooglePhoto || currentUser?.photoURL || null);
   
-  console.log('🎨 Avatar Debug:', { 
-    backendAvatarProvider, 
-    hasBackendUrl: !!backendAvatarUrl,
-    hasProviderPhoto: !!providerGooglePhoto,
-    hasFirebasePhoto: !!currentUser?.photoURL,
-    finalAvatarUrl: avatarUrl?.substring(0, 50) + '...',
-    imageFailed 
-  });
-
-  // Clear previous failure when avatar changes; rely on <img onError> for real failures
+ // Clear previous failure when avatar changes; rely on <img onError> for real failures
   useEffect(() => {
     setImageFailed(false);
   }, [avatarUrl]);
@@ -58,11 +50,11 @@ export default function Header() {
       // Fetch user from backend to get avatar preferences
       if (user) {
         try {
-          // Fetch backend user to check if they have a custom avatar
-          const backendUser = await getUserByFirebaseUid(user.uid);
-          setBackendAvatarUrl(backendUser?.avatarUrl || null);
-          setBackendAvatarProvider(backendUser?.avatarProvider || 'google');
-          console.log('Backend user loaded:', { avatarProvider: backendUser?.avatarProvider, hasCustomAvatar: backendUser?.avatarProvider === 'custom' });
+          const fetchedBackendUser = await getUserByFirebaseUid(user.uid);
+          setBackendUser(fetchedBackendUser);
+          setBackendAvatarUrl(fetchedBackendUser?.avatarUrl || null);
+          setBackendAvatarProvider(fetchedBackendUser?.avatarProvider || 'google');
+          console.log('Backend user loaded:', { avatarProvider: fetchedBackendUser?.avatarProvider, hasCustomAvatar: fetchedBackendUser?.avatarProvider === 'custom', role: fetchedBackendUser?.role });
         } catch (error: any) {
           // If user not found (404), create it
           if (error?.message?.includes('404') || error?.message?.toLowerCase().includes('not found')) {
@@ -74,16 +66,19 @@ export default function Header() {
                 avatarUrl: user.photoURL || undefined,
                 avatarProvider: user.photoURL ? 'google' : 'none',
               });
+              setBackendUser(created);
               setBackendAvatarUrl(created?.avatarUrl || null);
               setBackendAvatarProvider(created?.avatarProvider || 'google');
               console.log('User created in backend');
             } catch (createErr) {
               console.error('Failed to create user in backend:', createErr);
+              setBackendUser(null);
               setBackendAvatarUrl(null);
               setBackendAvatarProvider('google');
             }
           } else {
             console.error('Failed to fetch user from backend:', error);
+            setBackendUser(null);
             setBackendAvatarUrl(null);
             setBackendAvatarProvider('google');
           }
@@ -112,9 +107,10 @@ export default function Header() {
     const handler = async (e: any) => {
       try {
         if (!currentUser) return;
-        const backendUser = await getUserByFirebaseUid(currentUser.uid);
-        setBackendAvatarUrl(backendUser?.avatarUrl || null);
-        setBackendAvatarProvider(backendUser?.avatarProvider || 'google');
+        const fetchedBackendUser = await getUserByFirebaseUid(currentUser.uid);
+        setBackendUser(fetchedBackendUser);
+        setBackendAvatarUrl(fetchedBackendUser?.avatarUrl || null);
+        setBackendAvatarProvider(fetchedBackendUser?.avatarProvider || 'google');
         console.log('pfy:user-updated handled: reloaded backend avatar');
       } catch (err) {
         console.warn('pfy:user-updated: failed to reload backend user', err);
@@ -139,6 +135,19 @@ export default function Header() {
     { href: '/courses', label: 'Courses', icon: BookOpen },
     { href: '/progress', label: 'Progress', icon: TrendingUp },
   ];
+
+  const getRoleBadge = (role?: string | null) => {
+    if (!role) return null;
+    const r = String(role).toLowerCase();
+    if (r === 'owner') return 'Owner';
+    if (r === 'admin') return 'Admin';
+    return null;
+  };
+
+  const isAdmin = (() => {
+    const r = backendUser?.role ? String(backendUser.role).toLowerCase() : '';
+    return r === 'owner' || r === 'admin';
+  })();
 
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
@@ -245,7 +254,14 @@ export default function Header() {
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex flex-col space-y-1.5 flex-1 min-w-0">
-                            <p className="text-sm font-display font-bold leading-none truncate">{currentUser.displayName || 'User'}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-display font-bold leading-none truncate">{currentUser.displayName || 'User'}</p>
+                              {backendUser && getRoleBadge(backendUser.role) && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-linear-to-r from-amber-500 to-orange-500 text-white shadow-sm">
+                                  {getRoleBadge(backendUser.role)}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs font-sans leading-none text-muted-foreground truncate">
                               {currentUser.email}
                             </p>
@@ -259,6 +275,14 @@ export default function Header() {
                           Profile
                         </Link>
                       </DropdownMenuItem>
+                      {isAdmin && (
+                        <DropdownMenuItem asChild className="cursor-pointer py-3 px-3 rounded-md transition-all hover:bg-accent focus:bg-accent">
+                          <Link href="/admin-dashboard" className="flex items-center font-display font-semibold">
+                            <Shield className="mr-3 h-5 w-5" />
+                            Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator className="my-2 bg-border" />
                       <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer py-3 px-3 rounded-md font-display font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 focus:bg-red-50 dark:focus:bg-red-950/50 transition-all">
                         <LogOut className="mr-3 h-5 w-5" />
