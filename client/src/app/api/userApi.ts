@@ -165,16 +165,16 @@ export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
   try {
     const { storage } = await import('../lib/firebase');
     const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-    
+
     // Create a unique file name with timestamp to avoid collisions
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop() || 'jpg';
     const fileName = `${firebaseUid}_${timestamp}.${fileExtension}`;
     const storagePath = `avatars/${fileName}`;
-    
+
     // Create a reference to the file location
     const storageRef = ref(storage, storagePath);
-    
+
     // Upload the file
     const snapshot = await uploadBytes(storageRef, file, {
       contentType: file.type,
@@ -183,10 +183,10 @@ export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
         uploadedAt: new Date().toISOString(),
       },
     });
-    
+
     // Get the public download URL
     const downloadURL = await getDownloadURL(snapshot.ref);
-    
+
     return {
       avatarUrl: downloadURL,
       avatarStoragePath: storagePath,
@@ -209,7 +209,7 @@ export async function getUsers(params?: {
   if (params?.limit) searchParams.append('limit', params.limit.toString());
 
   const url = `${API_URL}/admin/users${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -271,6 +271,7 @@ export async function updateUserDetails(userId: string, payload: {
   displayName?: string;
   username?: string;
   email?: string;
+  role?: string;
 }): Promise<User> {
   const response = await fetch(`${API_URL}/admin/users/${userId}`, {
     method: 'PATCH',

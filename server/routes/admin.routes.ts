@@ -11,6 +11,8 @@ import {
   updateUserDetails,
   deleteUserById,
   reportUser,
+  updateCourse,
+  deleteCourse,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -87,5 +89,17 @@ router.delete('/users/:userId', deleteUserById);
  * Body: { reason, details? }
  */
 router.post('/users/:userId/report', reportUser);
+
+/**
+ * PUT /api/admin/courses/:courseId
+ * Update course details
+ */
+router.put('/courses/:courseId', updateCourse);
+
+/**
+ * DELETE /api/admin/courses/:courseId
+ * Delete course (soft delete)
+ */
+router.delete('/courses/:courseId', deleteCourse);
 
 export default router;

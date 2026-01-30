@@ -4,3 +4,6 @@ export { default as DeleteUserModal } from './DeleteUserModal';
 export { default as RoleChangeConfirmModal } from './RoleChangeConfirmModal';
 export { default as ReportUserModal } from './ReportUserModal';
 export { default as CreateCourseModal } from './CreateCourseModal';
+export { default as EditCourseModal } from './EditCourseModal';
+export { default as DeleteCourseModal } from './DeleteCourseModal';
+export { default as CourseDetailsModal } from './CourseDetailsModal';

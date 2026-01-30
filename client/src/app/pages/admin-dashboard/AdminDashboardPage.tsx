@@ -44,8 +44,9 @@ import {
   Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { storage } from '../../lib/firebase';
+import { storage, auth } from '../../lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTask } from 'firebase/storage';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   CreateUserModal,
   EditUserModal,
@@ -53,19 +54,24 @@ import {
   RoleChangeConfirmModal,
   ReportUserModal,
   CreateCourseModal,
+  EditCourseModal,
+  DeleteCourseModal,
 } from '../../components/modals';
 
 // Import API functions
-import { 
-  getUsers, 
-  createUser, 
+import {
+  getUsers,
+  createUser,
   updateUserDetails,
   deleteUserById,
-  reportUser as reportUserApi 
+  reportUser as reportUserApi,
+  getUserByFirebaseUid
 } from '../../api/userApi';
-import { 
-  getAllCourses, 
-  createCourse as createCourseApi 
+import {
+  getAllCourses,
+  createCourse as createCourseApi,
+  updateCourse as updateCourseApi,
+  deleteCourse as deleteCourseApi
 } from '../../api/courseApi';
 
 interface User {
@@ -125,7 +131,7 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const usersPerPage = 10;
@@ -137,9 +143,12 @@ export default function AdminDashboardPage() {
   const [isRoleChangeConfirmOpen, setIsRoleChangeConfirmOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
+  const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
+  const [isDeleteCourseModalOpen, setIsDeleteCourseModalOpen] = useState(false);
 
-  // Selected user for actions
+  // Selected for actions
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   // Form states
   const [createForm, setCreateForm] = useState<CreateUserForm>({
@@ -170,6 +179,15 @@ export default function AdminDashboardPage() {
     imageUrl: '',
   });
 
+  const [editCourseForm, setEditCourseForm] = useState<CourseForm>({
+    title: '',
+    description: '',
+    category: 'Programming',
+    duration: 0,
+    difficulty: 'beginner',
+    imageUrl: '',
+  });
+
   const [pendingRoleChange, setPendingRoleChange] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -189,17 +207,17 @@ export default function AdminDashboardPage() {
   });
 
   useEffect(() => {
-    const initDashboard = async () => {
-      try {
-        // Check if user is authenticated
-        const authToken = localStorage.getItem('authToken');
-        if (!authToken) {
-          router.push('/login');
-          return;
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-        // Get current user role
-        const userRole = localStorage.getItem('userRole');
+      try {
+        // Get current user role from backend
+        const backendUser = await getUserByFirebaseUid(user.uid);
+        const userRole = backendUser?.role?.toLowerCase() || '';
+
         if (userRole !== 'admin' && userRole !== 'owner') {
           toast.error('Access denied. Admin privileges required.');
           router.push('/');
@@ -213,12 +231,13 @@ export default function AdminDashboardPage() {
       } catch (error) {
         console.error('Error initializing dashboard:', error);
         toast.error('Failed to load dashboard data');
+        router.push('/');
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    initDashboard();
+    return () => unsubscribe();
   }, [router]);
 
   const loadUsers = async () => {
@@ -364,6 +383,71 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const openEditCourseModal = (course: Course) => {
+    setSelectedCourse(course);
+    setEditCourseForm({
+      title: course.title,
+      description: course.description,
+      category: course.category,
+      duration: course.duration,
+      difficulty: course.difficulty,
+      imageUrl: course.imageUrl || '',
+    });
+    setLocalPreview(course.imageUrl || null);
+    setIsEditCourseModalOpen(true);
+  };
+
+  const handleUpdateCourse = async () => {
+    if (!selectedCourse || !editCourseForm.title || !editCourseForm.description || !editCourseForm.category) {
+      toast.error('Title, description, and category are required');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateCourseApi(selectedCourse.id, {
+        title: editCourseForm.title,
+        description: editCourseForm.description,
+        category: editCourseForm.category,
+        duration: editCourseForm.duration || 0,
+        difficulty: editCourseForm.difficulty,
+        imageUrl: editCourseForm.imageUrl || undefined,
+      });
+      toast.success('Course updated successfully');
+      setIsEditCourseModalOpen(false);
+      setSelectedCourse(null);
+      await loadCourses();
+    } catch (error: any) {
+      console.error('Error updating course:', error);
+      toast.error(error.message || 'Failed to update course');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openDeleteCourseModal = (course: Course) => {
+    setSelectedCourse(course);
+    setIsDeleteCourseModalOpen(true);
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!selectedCourse) return;
+
+    setIsSaving(true);
+    try {
+      await deleteCourseApi(selectedCourse.id);
+      toast.success('Course deleted successfully');
+      setIsDeleteCourseModalOpen(false);
+      setSelectedCourse(null);
+      await loadCourses();
+    } catch (error: any) {
+      console.error('Error deleting course:', error);
+      toast.error(error.message || 'Failed to delete course');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleFileSelected = (file: File) => {
     if (!file) return;
 
@@ -371,7 +455,7 @@ export default function AdminDashboardPage() {
     try {
       const url = URL.createObjectURL(file);
       setLocalPreview(url);
-    } catch {}
+    } catch { }
 
     const filename = `${Date.now()}_${file.name}`;
     const storageReference = storageRef(storage, `courses/${filename}`);
@@ -423,7 +507,7 @@ export default function AdminDashboardPage() {
     try {
       uploadTask.cancel();
     } catch (e) {
-      try { uploadTask.cancel(); } catch {}
+      try { uploadTask.cancel(); } catch { }
     }
     setIsUploading(false);
     setUploadProgress(null);
@@ -441,14 +525,14 @@ export default function AdminDashboardPage() {
     if (!uploadTask) return;
     try {
       uploadTask.pause();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const resumeUpload = () => {
     if (!uploadTask) return;
     try {
       uploadTask.resume();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const openEditModal = (user: User) => {
@@ -481,7 +565,7 @@ export default function AdminDashboardPage() {
       if (localPreview && localPreview.startsWith('blob:')) {
         try {
           URL.revokeObjectURL(localPreview);
-        } catch {}
+        } catch { }
       }
     };
   }, [localPreview]);
@@ -631,19 +715,19 @@ export default function AdminDashboardPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="font-display px-4 py-3 border-r border-zinc-700/20">User</TableHead>
-                  <TableHead className="font-display px-4 py-3 border-r border-zinc-700/20">Role</TableHead>
-                  <TableHead className="font-display px-4 py-3 border-r border-zinc-700/20">Sign-ins</TableHead>
-                  <TableHead className="font-display px-4 py-3 border-r border-zinc-700/20">Last Sign In</TableHead>
+                  <TableHead className="font-display px-4 py-3 border-r border-border/50">User</TableHead>
+                  <TableHead className="font-display px-4 py-3 border-r border-border/50">Role</TableHead>
+                  <TableHead className="font-display px-4 py-3 border-r border-border/50">Sign-ins</TableHead>
+                  <TableHead className="font-display px-4 py-3 border-r border-border/50">Last Sign In</TableHead>
                   <TableHead className="font-display text-right px-4 py-3">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentUsers.map((user) => (
                   <TableRow key={user.id} className="hover:bg-muted/10 transition-colors">
-                    <TableCell className="px-4 py-3 border-r border-zinc-700/20">
+                    <TableCell className="px-4 py-3 border-r border-border/50">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
+                        <Avatar className="h-10 w-10 border border-border/50">
                           <AvatarImage src={user.avatarUrl || undefined} />
                           <AvatarFallback className="gradient-bg-primary text-primary-foreground">
                             {getInitials(user.displayName)}
@@ -655,36 +739,51 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-4 py-3 border-r border-zinc-700/20">
+                    <TableCell className="px-4 py-3 border-r border-border/50">
                       {user.role === 'owner' ? (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm w-fit">
-                          <Lock className="h-4 w-4 text-amber-400" />
-                          <span className="font-medium">Owner</span>
+                        <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-md text-sm w-fit">
+                          <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <span className="font-medium text-amber-600 dark:text-amber-400">Owner</span>
                         </div>
                       ) : (
-                        <div className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium w-fit ${
-                          user.role === 'admin'
-                            ? 'bg-zinc-900 border border-blue-500/30 text-blue-400'
-                            : 'bg-zinc-900 border border-emerald-500/30 text-emerald-400'
-                        }`}>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium w-fit border ${user.role === 'admin'
+                          ? 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
+                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          }`}>
                           <span className="capitalize">{user.role}</span>
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="px-4 py-3 border-r border-zinc-700/20">{user.signInCount}</TableCell>
-                    <TableCell className="text-muted-foreground px-4 py-3 border-r border-zinc-700/20">
+                    <TableCell className="px-4 py-3 border-r border-border/50">{user.signInCount}</TableCell>
+                    <TableCell className="text-muted-foreground px-4 py-3 border-r border-border/50">
                       {user.lastSignInAt
                         ? (() => {
-                            try {
-                              const d = new Date(user.lastSignInAt);
-                              const dd = String(d.getDate()).padStart(2, '0');
-                              const mm = String(d.getMonth() + 1).padStart(2, '0');
-                              const yyyy = d.getFullYear();
-                              return `${dd}/${mm}/${yyyy}`;
-                            } catch {
-                              return 'Invalid date';
-                            }
-                          })()
+                          try {
+                            const d = new Date(user.lastSignInAt);
+
+                            // Date parts
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const yyyy = d.getFullYear();
+
+                            // Time parts
+                            let hours = d.getHours();
+                            const minutes = String(d.getMinutes()).padStart(2, '0');
+                            const ampm = hours >= 12 ? 'PM' : 'AM';
+                            hours = hours % 12;
+                            hours = hours ? hours : 12; // the hour '0' should be '12'
+                            const strTime = hours + ':' + minutes + ' ' + ampm;
+
+                            return (
+                              <div className="flex flex-col">
+                                <span className="text-foreground font-medium">{dd}/{mm}/{yyyy}</span>
+                                <span className="text-[10px] uppercase tracking-wider opacity-70">{strTime}</span>
+                              </div>
+                            );
+                          } catch {
+                            return 'Invalid date';
+                          }
+                        })()
                         : 'Never'
                       }
                     </TableCell>
@@ -810,6 +909,24 @@ export default function AdminDashboardPage() {
                     <Badge variant="outline">{course.duration}h</Badge>
                   </div>
                 </CardContent>
+                <div className="flex items-center justify-end gap-2 p-4 pt-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => openEditCourseModal(course)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    onClick={() => openDeleteCourseModal(course)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
@@ -885,6 +1002,31 @@ export default function AdminDashboardPage() {
         pauseUpload={pauseUpload}
         resumeUpload={resumeUpload}
         handleCreateCourse={handleCreateCourse}
+        isSaving={isSaving}
+      />
+
+      <EditCourseModal
+        open={isEditCourseModalOpen}
+        onOpenChange={setIsEditCourseModalOpen}
+        editCourseForm={editCourseForm}
+        setEditCourseForm={setEditCourseForm}
+        fileInputRef={fileInputRef}
+        localPreview={localPreview}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
+        handleFileUpload={handleFileUpload}
+        cancelUpload={cancelUpload}
+        pauseUpload={pauseUpload}
+        resumeUpload={resumeUpload}
+        handleUpdateCourse={handleUpdateCourse}
+        isSaving={isSaving}
+      />
+
+      <DeleteCourseModal
+        open={isDeleteCourseModalOpen}
+        onOpenChange={setIsDeleteCourseModalOpen}
+        selectedCourse={selectedCourse}
+        onDelete={handleDeleteCourse}
         isSaving={isSaving}
       />
     </div>

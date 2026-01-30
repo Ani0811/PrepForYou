@@ -29,22 +29,22 @@ export default function Header() {
   const [backendAvatarUrl, setBackendAvatarUrl] = useState<string | null>(null);
   const [backendAvatarProvider, setBackendAvatarProvider] = useState<string | null>(null);
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
-  
+
   // Avatar selection logic: if user set custom avatar, use it; otherwise use Google provider photo
   const providerGooglePhoto = currentUser?.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
-  const avatarUrl = (backendAvatarProvider === 'custom' && backendAvatarUrl) 
-    ? backendAvatarUrl 
+  const avatarUrl = (backendAvatarProvider === 'custom' && backendAvatarUrl)
+    ? backendAvatarUrl
     : (providerGooglePhoto || currentUser?.photoURL || null);
-  
- // Clear previous failure when avatar changes; rely on <img onError> for real failures
+
+  // Clear previous failure when avatar changes; rely on <img onError> for real failures
   useEffect(() => {
     setImageFailed(false);
   }, [avatarUrl]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        const providerPhoto = user?.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
-        console.log('Auth state changed:', user?.displayName, 'photoURL=', user?.photoURL, 'providerPhoto=', providerPhoto, 'providerData=', user?.providerData);
+      const providerPhoto = user?.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
+      console.log('Auth state changed:', user?.displayName, 'photoURL=', user?.photoURL, 'providerPhoto=', providerPhoto, 'providerData=', user?.providerData);
       setCurrentUser(user);
 
       // Fetch user from backend to get avatar preferences
@@ -204,7 +204,7 @@ export default function Header() {
             </nav>
 
             <ThemeSwitcher />
-            
+
             {!isLoading && (
               <div className="flex items-center gap-2">
                 {currentUser ? (
@@ -212,28 +212,27 @@ export default function Header() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-10 gap-2 rounded-full pr-3 pl-2 transition-all duration-300 hover:scale-105 hover:shadow-md">
                         <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-                            {!imageFailed && avatarUrl ? (
-                              <AvatarImage
-                                className="object-cover"
-                                src={avatarUrl}
-                                alt={currentUser.displayName || 'User'}
-                                onError={(e: any) => { console.error('Avatar image failed to load', { src: avatarUrl, event: e }); setImageFailed(true); }}
-                                {...(avatarUrl && !avatarUrl.startsWith?.('data:') ? { crossOrigin: 'anonymous' } : {})}
-                              />
-                            ) : null}
-                            <AvatarFallback className="gradient-bg-primary text-primary-foreground font-display font-semibold text-sm">
-                              {getInitials(currentUser.displayName)}
-                            </AvatarFallback>
-                          </Avatar>
+                          {!imageFailed && avatarUrl ? (
+                            <AvatarImage
+                              className="object-cover"
+                              src={avatarUrl}
+                              alt={currentUser.displayName || 'User'}
+                              onError={(e: any) => { console.error('Avatar image failed to load', { src: avatarUrl, event: e }); setImageFailed(true); }}
+                              {...(avatarUrl && !avatarUrl.startsWith?.('data:') ? { crossOrigin: 'anonymous' } : {})}
+                            />
+                          ) : null}
+                          <AvatarFallback className="gradient-bg-primary text-primary-foreground font-display font-semibold text-sm">
+                            {getInitials(currentUser.displayName)}
+                          </AvatarFallback>
+                        </Avatar>
                         <span className="hidden sm:inline font-display font-medium">
                           {currentUser.displayName?.split(' ')[0] || 'Account'}
                         </span>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent 
-                      className="w-72 p-3 shadow-2xl border border-border text-popover-foreground rounded-lg z-60" 
-                      style={{ backgroundColor: 'rgba(8,8,10,0.98)' }}
-                      align="end" 
+                    <DropdownMenuContent
+                      className="w-72 p-3 shadow-2xl border border-border bg-popover/95 backdrop-blur-xl text-popover-foreground rounded-lg z-60"
+                      align="end"
                       forceMount
                       sideOffset={8}
                     >

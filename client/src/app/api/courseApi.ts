@@ -66,14 +66,14 @@ export async function getAllCourses(params?: {
   limit?: number;
 }): Promise<{ courses: Course[]; pagination: any }> {
   const searchParams = new URLSearchParams();
-  
+
   if (params?.category) searchParams.append('category', params.category);
   if (params?.difficulty) searchParams.append('difficulty', params.difficulty);
   if (params?.page) searchParams.append('page', params.page.toString());
   if (params?.limit) searchParams.append('limit', params.limit.toString());
 
   const url = `${API_URL}/courses${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -129,9 +129,9 @@ export async function getCoursesWithProgress(
 ): Promise<CourseWithProgress[]> {
   const searchParams = new URLSearchParams();
   if (category && category !== 'All') searchParams.append('category', category);
-  
+
   const url = `${API_URL}/courses/user/${firebaseUid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-  
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -232,4 +232,52 @@ export async function createCourse(payload: CreateCoursePayload): Promise<Course
 
   const data = await response.json();
   return data.course;
+}
+
+/**
+ * Update a course (admin only)
+ */
+export async function updateCourse(courseId: string, payload: Partial<CreateCoursePayload>): Promise<Course> {
+  const response = await fetch(`${API_URL}/admin/courses/${courseId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to update course';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/admin/courses/${courseId}`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.course;
+}
+
+/**
+ * Delete a course (admin only)
+ */
+export async function deleteCourse(courseId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/admin/courses/${courseId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to delete course';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/admin/courses/${courseId}`, status: response.status, body });
+    throw new Error(errMsg);
+  }
 }

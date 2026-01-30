@@ -41,9 +41,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     return res.status(200).json({ success: true, stats });
   } catch (error: any) {
     console.error('Error fetching dashboard stats:', error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch dashboard stats', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to fetch dashboard stats',
+      details: error.message
     });
   }
 };
@@ -113,9 +113,9 @@ export const getAllUsersWithStats = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error fetching users with stats:', error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch users', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to fetch users',
+      details: error.message
     });
   }
 };
@@ -181,9 +181,9 @@ export const getAllCoursesWithMetrics = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error fetching courses with metrics:', error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch courses', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to fetch courses',
+      details: error.message
     });
   }
 };
@@ -200,8 +200,8 @@ export const updateUserRole = async (req: Request, res: Response) => {
 
     // Validate role
     if (!['user', 'admin', 'owner'].includes(role)) {
-      return res.status(400).json({ 
-        error: 'Invalid role. Must be user, admin, or owner' 
+      return res.status(400).json({
+        error: 'Invalid role. Must be user, admin, or owner'
       });
     }
 
@@ -216,8 +216,8 @@ export const updateUserRole = async (req: Request, res: Response) => {
 
     // Prevent changing owner role
     if (user.role === 'owner') {
-      return res.status(403).json({ 
-        error: 'Cannot modify owner role' 
+      return res.status(403).json({
+        error: 'Cannot modify owner role'
       });
     }
 
@@ -227,15 +227,15 @@ export const updateUserRole = async (req: Request, res: Response) => {
       data: { role },
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      user: updatedUser 
+    return res.status(200).json({
+      success: true,
+      user: updatedUser
     });
   } catch (error: any) {
     console.error('Error updating user role:', error);
-    return res.status(500).json({ 
-      error: 'Failed to update user role', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to update user role',
+      details: error.message
     });
   }
 };
@@ -251,8 +251,8 @@ export const toggleCoursePublished = async (req: Request, res: Response) => {
     const { isPublished } = req.body;
 
     if (typeof isPublished !== 'boolean') {
-      return res.status(400).json({ 
-        error: 'isPublished must be a boolean' 
+      return res.status(400).json({
+        error: 'isPublished must be a boolean'
       });
     }
 
@@ -261,15 +261,15 @@ export const toggleCoursePublished = async (req: Request, res: Response) => {
       data: { isPublished },
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      course 
+    return res.status(200).json({
+      success: true,
+      course
     });
   } catch (error: any) {
     console.error('Error toggling course published status:', error);
-    return res.status(500).json({ 
-      error: 'Failed to update course', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to update course',
+      details: error.message
     });
   }
 };
@@ -293,8 +293,8 @@ export const deactivateUser = async (req: Request, res: Response) => {
     }
 
     if (user.role === 'owner') {
-      return res.status(403).json({ 
-        error: 'Cannot deactivate owner account' 
+      return res.status(403).json({
+        error: 'Cannot deactivate owner account'
       });
     }
 
@@ -304,16 +304,16 @@ export const deactivateUser = async (req: Request, res: Response) => {
       data: { isActive: false },
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      message: 'User deactivated', 
-      user: deactivatedUser 
+    return res.status(200).json({
+      success: true,
+      message: 'User deactivated',
+      user: deactivatedUser
     });
   } catch (error: any) {
     console.error('Error deactivating user:', error);
-    return res.status(500).json({ 
-      error: 'Failed to deactivate user', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to deactivate user',
+      details: error.message
     });
   }
 };
@@ -359,15 +359,15 @@ export const getActivityLogs = async (req: Request, res: Response) => {
       timestamp: activity.updatedAt,
     }));
 
-    return res.status(200).json({ 
-      success: true, 
-      activities 
+    return res.status(200).json({
+      success: true,
+      activities
     });
   } catch (error: any) {
     console.error('Error fetching activity logs:', error);
-    return res.status(500).json({ 
-      error: 'Failed to fetch activity logs', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to fetch activity logs',
+      details: error.message
     });
   }
 };
@@ -386,8 +386,8 @@ export const createUser = async (req: Request, res: Response) => {
 
     // Validate role
     if (!['user', 'admin'].includes(role)) {
-      return res.status(400).json({ 
-        error: 'Invalid role. Can only create user or admin accounts' 
+      return res.status(400).json({
+        error: 'Invalid role. Can only create user or admin accounts'
       });
     }
 
@@ -402,7 +402,7 @@ export const createUser = async (req: Request, res: Response) => {
 
     // Create user with generated firebaseUid placeholder
     const firebaseUid = `admin-created-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const newUser = await prisma.user.create({
       data: {
         firebaseUid,
@@ -416,15 +416,15 @@ export const createUser = async (req: Request, res: Response) => {
       },
     });
 
-    return res.status(201).json({ 
-      success: true, 
-      user: newUser 
+    return res.status(201).json({
+      success: true,
+      user: newUser
     });
   } catch (error: any) {
     console.error('Error creating user:', error);
-    return res.status(500).json({ 
-      error: 'Failed to create user', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to create user',
+      details: error.message
     });
   }
 };
@@ -437,10 +437,17 @@ export const updateUserDetails = async (req: Request, res: Response) => {
   try {
     const userIdParam = req.params.userId;
     const userId = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
-    const { displayName, username, email } = req.body;
+    const { displayName, username, email, role } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Validate role if provided
+    if (role && !['user', 'admin', 'owner'].includes(role)) {
+      return res.status(400).json({
+        error: 'Invalid role. Must be user, admin, or owner'
+      });
     }
 
     // Check if user exists
@@ -453,9 +460,9 @@ export const updateUserDetails = async (req: Request, res: Response) => {
     }
 
     // Prevent modifying owner
-    if (user.role === 'owner') {
-      return res.status(403).json({ 
-        error: 'Cannot modify owner account details' 
+    if (user.role === 'owner' && role !== 'owner') {
+      return res.status(403).json({
+        error: 'Cannot modify owner account role'
       });
     }
 
@@ -496,18 +503,19 @@ export const updateUserDetails = async (req: Request, res: Response) => {
         ...(displayName !== undefined && { displayName }),
         ...(username !== undefined && { username }),
         ...(email !== undefined && { email }),
+        ...(role !== undefined && { role }),
       },
     });
 
-    return res.status(200).json({ 
-      success: true, 
-      user: updatedUser 
+    return res.status(200).json({
+      success: true,
+      user: updatedUser
     });
   } catch (error: any) {
     console.error('Error updating user details:', error);
-    return res.status(500).json({ 
-      error: 'Failed to update user', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to update user',
+      details: error.message
     });
   }
 };
@@ -536,8 +544,8 @@ export const deleteUserById = async (req: Request, res: Response) => {
 
     // Prevent deleting owner
     if (user.role === 'owner') {
-      return res.status(403).json({ 
-        error: 'Cannot delete owner account' 
+      return res.status(403).json({
+        error: 'Cannot delete owner account'
       });
     }
 
@@ -547,16 +555,16 @@ export const deleteUserById = async (req: Request, res: Response) => {
       data: { isActive: false },
     });
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       message: 'User deleted successfully',
-      user: deletedUser 
+      user: deletedUser
     });
   } catch (error: any) {
     console.error('Error deleting user:', error);
-    return res.status(500).json({ 
-      error: 'Failed to delete user', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to delete user',
+      details: error.message
     });
   }
 };
@@ -594,16 +602,109 @@ export const reportUser = async (req: Request, res: Response) => {
     });
 
     // Return success (in production, create report record)
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       message: 'User reported successfully',
       reportId: `report-${Date.now()}`,
     });
   } catch (error: any) {
     console.error('Error reporting user:', error);
-    return res.status(500).json({ 
-      error: 'Failed to report user', 
-      details: error.message 
+    return res.status(500).json({
+      error: 'Failed to report user',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Update course details (admin/owner only)
+ * PATCH /api/admin/courses/:courseId
+ */
+export const updateCourse = async (req: Request, res: Response) => {
+  try {
+    const courseIdParam = req.params.courseId;
+    const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : courseIdParam;
+    const { title, description, category, duration, difficulty, imageUrl, tags, isPublished } = req.body;
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Check if course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Update course
+    const updatedCourse = await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(category !== undefined && { category }),
+        ...(duration !== undefined && { duration: Number(duration) }),
+        ...(difficulty !== undefined && { difficulty }),
+        ...(imageUrl !== undefined && { imageUrl }),
+        ...(tags !== undefined && { tags }),
+        ...(isPublished !== undefined && { isPublished }),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      course: updatedCourse
+    });
+  } catch (error: any) {
+    console.error('Error updating course:', error);
+    return res.status(500).json({
+      error: 'Failed to update course',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Delete course (soft delete)
+ * DELETE /api/admin/courses/:courseId
+ */
+export const deleteCourse = async (req: Request, res: Response) => {
+  try {
+    const courseIdParam = req.params.courseId;
+    const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : courseIdParam;
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required' });
+    }
+
+    // Check if course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Soft delete
+    const deletedCourse = await prisma.course.update({
+      where: { id: courseId },
+      data: { isActive: false },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Course deleted successfully',
+      course: deletedCourse
+    });
+  } catch (error: any) {
+    console.error('Error deleting course:', error);
+    return res.status(500).json({
+      error: 'Failed to delete course',
+      details: error.message
     });
   }
 };

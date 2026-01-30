@@ -27,150 +27,172 @@ interface Props {
 export default function CreateCourseModal({ open, onOpenChange, courseForm, setCourseForm, fileInputRef, handleFileUpload, handleFileSelected, isUploading, uploadProgress, localPreview, cancelUpload, pauseUpload, resumeUpload, handleCreateCourse, isSaving }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md! w-full rounded-lg bg-zinc-900/70 border border-zinc-700 shadow-lg ring-1 ring-zinc-700/30">
-        <DialogHeader>
-          <DialogTitle>Create New Course</DialogTitle>
-          <DialogDescription>
-            Add a new course to your platform. All fields marked with * are required.
+      <DialogContent
+        className="sm:max-w-2xl! w-full fixed top-[55%]! flex flex-col rounded-xl border border-border shadow-2xl p-0 overflow-hidden z-[60]"
+        style={{ backgroundColor: 'oklch(var(--background))' }}
+      >
+        <DialogHeader className="flex-none p-5 pb-0">
+          <DialogTitle className="text-2xl font-display font-bold gradient-text">Create New Course</DialogTitle>
+          <DialogDescription className="text-muted-foreground mt-1">
+            Fill in the details below to launch your new course.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Title <span className="text-red-500">*</span></label>
-            <Input
-              placeholder="Course title"
-              value={courseForm.title}
-              onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
-            />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Description <span className="text-red-500">*</span></label>
-            <textarea
-              className="flex min-h-25 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Course description"
-              value={courseForm.description}
-              onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Category <span className="text-red-500">*</span></label>
-            <Select
-              value={courseForm.category}
-              onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Programming">Programming</SelectItem>
-                <SelectItem value="Design">Design</SelectItem>
-                <SelectItem value="Business">Business</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Data Science">Data Science</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Duration (minutes)</label>
-            <Input
-              type="number"
-              placeholder="0"
-              min="0"
-              value={courseForm.duration || ''}
-              onChange={(e) => setCourseForm({ ...courseForm, duration: parseInt(e.target.value) || 0 })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Difficulty</label>
-            <Select
-              value={courseForm.difficulty}
-              onValueChange={(value: 'beginner' | 'intermediate' | 'advanced') =>
-                setCourseForm({ ...courseForm, difficulty: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="beginner">Beginner</SelectItem>
-                <SelectItem value="intermediate">Intermediate</SelectItem>
-                <SelectItem value="advanced">Advanced</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Image URL or Upload</label>
-            <Input
-              placeholder="https://example.com/image.jpg"
-              value={courseForm.imageUrl}
-              onChange={(e) => setCourseForm({ ...courseForm, imageUrl: e.target.value })}
-            />
-
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const file = e.dataTransfer?.files?.[0];
-                if (file) handleFileSelected(file);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-2 flex items-center justify-center gap-4 rounded-md border border-dashed border-zinc-700 p-4 bg-zinc-800/30 cursor-pointer text-sm text-muted-foreground hover:bg-zinc-800/40"
-            >
-              <div className="flex flex-col items-center">
-                <div className="text-sm">Drop image here, or click to select</div>
-                <div className="text-xs text-muted-foreground">PNG, JPG, GIF — max 10MB</div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column: Core Info */}
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Title <span className="text-red-500">*</span></label>
+                <Input
+                  placeholder="e.g. Advanced Web Development"
+                  value={courseForm.title}
+                  className="bg-accent/5 focus:bg-accent/10 transition-colors border-border"
+                  onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                />
               </div>
-              <input
-                ref={fileInputRef}
-                id="course-image-file"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
+
+              <div className="space-y-1.5 text-foreground!">
+                <label className="text-sm font-medium text-foreground">Description <span className="text-red-500">*</span></label>
+                <textarea
+                  className="flex min-h-[140px] w-full rounded-md border border-input bg-accent/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:bg-accent/10 text-foreground"
+                  placeholder="What will students learn in this course?"
+                  value={courseForm.description}
+                  onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                />
+              </div>
             </div>
 
-            {localPreview || courseForm.imageUrl ? (
-              <div className="mt-3 flex items-start gap-3">
-                <img
-                  src={localPreview || courseForm.imageUrl}
-                  alt="Course preview"
-                  className="h-20 w-28 rounded-md object-cover border border-zinc-700"
-                />
-                <div className="flex flex-col gap-2">
-                  {isUploading && (
-                    <div className="text-sm text-muted-foreground">Uploading: {uploadProgress ?? 0}%</div>
-                  )}
-                  <div className="flex gap-2">
-                    {isUploading ? (
-                      <>
-                        <Button size="sm" variant="outline" onClick={pauseUpload}>Pause</Button>
-                        <Button size="sm" variant="outline" onClick={resumeUpload}>Resume</Button>
-                        <Button size="sm" variant="destructive" onClick={cancelUpload}>Cancel</Button>
-                      </>
-                    ) : (
-                        <Button size="sm" variant="ghost" onClick={() => {
-                        if (localPreview && localPreview.startsWith('blob:')) URL.revokeObjectURL(localPreview);
-                        // @ts-ignore
-                        // clear preview
-                        (window as any).setLocalPreview?.(null);
-                        setTimeout(() => setCourseForm((prev: any) => ({ ...prev, imageUrl: '' })), 0);
-                      }}>Remove</Button>
-                    )}
-                  </div>
+            {/* Right Column: Settings & Media */}
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Category <span className="text-red-500">*</span></label>
+                  <Select
+                    value={courseForm.category}
+                    onValueChange={(value) => setCourseForm({ ...courseForm, category: value })}
+                  >
+                    <SelectTrigger className="bg-accent/5 border-border">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent
+                      className="border-border z-[70]! opacity-100! shadow-2xl"
+                      style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
+                    >
+                      <SelectItem value="Programming">Programming</SelectItem>
+                      <SelectItem value="Design">Design</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Data Science">Data Science</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">Difficulty</label>
+                  <Select
+                    value={courseForm.difficulty}
+                    onValueChange={(value: 'beginner' | 'intermediate' | 'advanced') =>
+                      setCourseForm({ ...courseForm, difficulty: value })
+                    }
+                  >
+                    <SelectTrigger className="bg-accent/5 border-border">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent
+                      className="border-border z-[70]! opacity-100! shadow-2xl"
+                      style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
+                    >
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            ) : null}
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Duration (minutes)</label>
+                <Input
+                  type="number"
+                  placeholder="120"
+                  min="0"
+                  className="bg-accent/5 transition-colors focus:bg-accent/10 border-border"
+                  value={courseForm.duration || ''}
+                  onChange={(e) => setCourseForm({ ...courseForm, duration: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Course Thumbnail</label>
+
+                <Input
+                  placeholder="Paste image URL here..."
+                  value={courseForm.imageUrl}
+                  className="bg-accent/5 mb-2 transition-colors focus:bg-accent/10 border-border text-xs"
+                  onChange={(e) => setCourseForm({ ...courseForm, imageUrl: e.target.value })}
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group relative flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border p-5 bg-accent/5 cursor-pointer hover:bg-accent/10 hover:border-primary/50 transition-all overflow-hidden"
+                >
+                  {(localPreview || courseForm.imageUrl) ? (
+                    <>
+                      <img
+                        src={localPreview || courseForm.imageUrl}
+                        alt="Course preview"
+                        className="absolute inset-0 h-full w-full object-cover opacity-20 group-hover:opacity-10 transition-opacity"
+                      />
+                      <div className="relative z-10 text-center">
+                        <div className="font-medium text-sm">Update Image</div>
+                        <div className="text-[10px] opacity-60">Click or drag to replace</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center">
+                      <div className="font-medium text-sm">Upload Thumbnail</div>
+                      <div className="text-[10px] opacity-60">PNG, JPG, WEBP</div>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    id="course-image-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                </div>
+
+                {isUploading && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex justify-between text-[10px] font-medium text-primary">
+                      <span>Uploading...</span>
+                      <span>{uploadProgress ?? 0}%</span>
+                    </div>
+                    <div className="h-1 w-full bg-accent/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${uploadProgress ?? 0}%` }}
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end mt-1">
+                      <button onClick={pauseUpload} className="text-[10px] hover:text-primary transition-colors">Pause</button>
+                      <button onClick={resumeUpload} className="text-[10px] hover:text-primary transition-colors">Resume</button>
+                      <button onClick={cancelUpload} className="text-[10px] hover:text-red-500 transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="flex-none p-5 pt-4 border-t border-border bg-background/50">
           <Button
             variant="outline"
+            className="hover:bg-accent"
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >
@@ -179,7 +201,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
           <Button
             onClick={handleCreateCourse}
             disabled={!courseForm.title || !courseForm.description || !courseForm.category || isSaving}
-            className="gradient-bg-primary"
+            className="gradient-bg-primary shadow-lg shadow-primary/20"
           >
             {isSaving ? 'Creating...' : 'Create Course'}
           </Button>

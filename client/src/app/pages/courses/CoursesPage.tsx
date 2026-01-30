@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
 import { Progress } from '../../components/ui/progress';
 import { BookOpen, Clock, Award, Sparkles, Star } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getCoursesWithProgress, getRecommendedCourses, type CourseWithProgress } from '../../api/courseApi';
+import { getCoursesWithProgress, getRecommendedCourses, updateCourseProgress, type CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
+import { CourseDetailsModal } from '../../components/modals';
 
 export default function CoursesPage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -18,6 +20,9 @@ export default function CoursesPage() {
   const [recommendedCourses, setRecommendedCourses] = useState<CourseWithProgress[]>([]);
   const [isLoadingRecommended, setIsLoadingRecommended] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCourse, setSelectedCourse] = useState<CourseWithProgress | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -68,7 +73,7 @@ export default function CoursesPage() {
   };
 
   const categories = ['All', ...Array.from(new Set(courses.map(c => c.category)))];
-  
+
   const getCoursesByCategory = (category: string) => {
     if (category === 'All') return courses;
     return courses.filter(c => c.category === category);
@@ -78,6 +83,35 @@ export default function CoursesPage() {
     if (progress === 0) return { label: 'Not Started', variant: 'secondary' as const };
     if (progress === 100) return { label: 'Completed', variant: 'default' as const };
     return { label: 'In Progress', variant: 'outline' as const };
+  };
+
+  const openCourseDetails = (course: CourseWithProgress) => {
+    setSelectedCourse(course);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleEnroll = async () => {
+    if (!selectedCourse || !user) return;
+
+    setIsEnrolling(true);
+    try {
+      await updateCourseProgress(selectedCourse.id, user.uid, {
+        status: 'in-progress',
+        progress: 0
+      });
+
+      toast.success('Successfully enrolled!');
+      setIsDetailsModalOpen(false);
+
+      // Refresh courses to show updated status
+      await fetchCourses(user.uid, selectedCategory === 'All' ? undefined : selectedCategory);
+      fetchRecommendedCourses(user.uid);
+    } catch (error: any) {
+      console.error('Error enrolling in course:', error);
+      toast.error('Failed to enroll in course');
+    } finally {
+      setIsEnrolling(false);
+    }
   };
 
   if (!user) {
@@ -224,9 +258,9 @@ export default function CoursesPage() {
       <Tabs defaultValue="All" className="w-full" onValueChange={handleCategoryChange}>
         <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto gradient-bg-secondary backdrop-blur-sm">
           {categories.map((category) => (
-            <TabsTrigger 
-              key={category} 
-              value={category} 
+            <TabsTrigger
+              key={category}
+              value={category}
               className="px-4 font-medium font-display data-[state=active]:gradient-bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-gradient-md transition-all duration-300 data-[state=active]:scale-105"
             >
               {category}
@@ -295,12 +329,24 @@ export default function CoursesPage() {
                           </Badge>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground font-sans">Progress</span>
-                            <span className="font-semibold font-display">{course.progress}%</span>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground font-sans">Progress</span>
+                              <span className="font-semibold font-display">{course.progress}%</span>
+                            </div>
+                            <Progress value={course.progress} className="h-2" />
                           </div>
-                          <Progress value={course.progress} className="h-2" />
+
+                          <Button
+                            className="w-full gradient-bg-primary shadow-lg shadow-primary/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCourseDetails(course);
+                            }}
+                          >
+                            View Course
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -311,6 +357,14 @@ export default function CoursesPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      <CourseDetailsModal
+        open={isDetailsModalOpen}
+        onOpenChange={setIsDetailsModalOpen}
+        course={selectedCourse}
+        onEnroll={handleEnroll}
+        isEnrolling={isEnrolling}
+      />
     </div>
   );
 }
