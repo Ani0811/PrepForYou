@@ -636,24 +636,25 @@ export const updateCourse = async (req: Request, res: Response) => {
   try {
     const courseIdParam = req.params.courseId;
     const courseId = Array.isArray(courseIdParam) ? courseIdParam[0] : courseIdParam;
-    const { title, description, category, duration, difficulty, imageUrl, tags, isPublished } = req.body;
+    const { title, description, category, duration, difficulty, imageUrl, tags, isPublished, lessons } = req.body;
 
     if (!courseId) {
       return res.status(400).json({ error: 'courseId is required' });
     }
 
     // Check if course exists
-    const course = await prisma.course.findUnique({
+    const existingCourse = await prisma.course.findUnique({
       where: { id: courseId },
+      include: { lessons: true }
     });
 
-    if (!course) {
+    if (!existingCourse) {
       return res.status(404).json({ error: 'Course not found' });
     }
 
     // specific check if publishing
     if (isPublished === true) {
-      const lessonCount = await prisma.lesson.count({
+      const lessonCount = lessons ? lessons.length : await prisma.lesson.count({
         where: { courseId },
       });
 
@@ -664,24 +665,69 @@ export const updateCourse = async (req: Request, res: Response) => {
       }
     }
 
-    // Update course
-    const updatedCourse = await prisma.course.update({
-      where: { id: courseId },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(category !== undefined && { category }),
-        ...(duration !== undefined && { duration: Number(duration) }),
-        ...(difficulty !== undefined && { difficulty }),
-        ...(imageUrl !== undefined && { imageUrl }),
-        ...(tags !== undefined && { tags }),
-        ...(isPublished !== undefined && { isPublished }),
-      },
+    // Use transaction for course update and lesson synchronization
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Update course details
+      const updatedCourse = await tx.course.update({
+        where: { id: courseId },
+        data: {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description }),
+          ...(category !== undefined && { category }),
+          ...(duration !== undefined && { duration: Number(duration) }),
+          ...(difficulty !== undefined && { difficulty }),
+          ...(imageUrl !== undefined && { imageUrl }),
+          ...(tags !== undefined && { tags }),
+          ...(isPublished !== undefined && { isPublished }),
+        },
+      });
+
+      // 2. Synchronize lessons if provided
+      if (lessons && Array.isArray(lessons)) {
+        // Find lessons to delete (exist in DB but not in payload)
+        const payloadLessonIds = lessons.filter(l => l.id).map(l => l.id);
+
+        await tx.lesson.deleteMany({
+          where: {
+            courseId: courseId,
+            id: { notIn: payloadLessonIds as string[] }
+          }
+        });
+
+        // Update or Create lessons
+        for (const lesson of lessons) {
+          if (lesson.id) {
+            // Update existing lesson
+            await tx.lesson.update({
+              where: { id: lesson.id },
+              data: {
+                title: lesson.title,
+                content: lesson.content,
+                order: lesson.order,
+                duration: lesson.duration || 15
+              }
+            });
+          } else {
+            // Create new lesson
+            await tx.lesson.create({
+              data: {
+                title: lesson.title,
+                content: lesson.content,
+                order: lesson.order,
+                duration: lesson.duration || 15,
+                courseId: courseId
+              }
+            });
+          }
+        }
+      }
+
+      return updatedCourse;
     });
 
     return res.status(200).json({
       success: true,
-      course: updatedCourse
+      course: result
     });
   } catch (error: any) {
     console.error('Error updating course:', error);

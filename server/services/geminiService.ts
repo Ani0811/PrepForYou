@@ -35,7 +35,8 @@ export class GeminiService {
             const model = this.getModel();
 
             const prompt = `
-        You are an expert course creator. Create a structured lesson plan for a course on "${topic}".
+        You are a world-class technical instructor and course creator known for clear, engaging, and practical teaching.
+        Create a detailed, structured lesson plan for a course on "${topic}".
         Target Audience Level: ${level}
         Number of Lessons: ${count}
         
@@ -43,16 +44,26 @@ export class GeminiService {
         {
           "lessons": [
             {
-              "title": "Lesson Title",
-              "content": "Detailed educational content in Markdown format, clearly explaining the concept.",
+              "title": "Engaging Lesson Title",
+              "content": "Full markdown content string",
               "duration": 15
             }
           ]
         }
         
-        Rules:
-        1. "content" must be detailed (at least 2-3 paragraphs) and formatted in Markdown.
-        2. "duration" should be an estimated integer in minutes.
+        CRITICAL CONTENT RULES:
+        1. **Format**: The "content" field MUST be valid Markdown.
+        2. **Structure**: Each lesson's content MUST follow this structure:
+           - **Introduction**: Briefly explain what will be learned and why it matters.
+           - **Core Concepts**: Explain the theory clearly using analogies where helpful.
+           - **Practical Examples (MANDATORY)**: If the topic allows (especially for programming), you MUST provide code examples.
+             - Use standard Markdown code blocks: \`\`\`language ... \`\`\`
+             - Add comments to explain the code.
+           - **Real-World Application**: How is this used in industry?
+           - **Summary**: A quick recap of key takeaways.
+        3. **Tone**: Professional, encouraging, and authoritative but accessible.
+        4. **Length**: Each lesson should be substantial (approx. 400-600 words) to provide real value. Avoid superficial summaries.
+        5. **Code**: For programming topics, code examples are NOT optional. They must be included and explained.
       `;
 
             const result = await model.generateContent(prompt);

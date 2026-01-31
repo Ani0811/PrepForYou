@@ -68,6 +68,7 @@ export interface UpdateProgressPayload {
 }
 
 export interface AddLessonPayload {
+  id?: string;
   title: string;
   content: string;
   order: number;

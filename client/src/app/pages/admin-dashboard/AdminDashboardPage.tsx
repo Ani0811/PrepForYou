@@ -71,6 +71,7 @@ import {
 } from '../../api/userApi';
 import {
   getAllCourses,
+  getCourseById,
   createCourse as createCourseApi,
   updateCourse as updateCourseApi,
   deleteCourse as deleteCourseApi,
@@ -127,6 +128,7 @@ interface CourseForm {
   duration: number;
   difficulty: string;
   imageUrl: string;
+  lessons?: AddLessonPayload[];
 }
 
 export default function AdminDashboardPage() {
@@ -389,8 +391,10 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const openEditCourseModal = (course: Course) => {
+  const openEditCourseModal = async (course: Course) => {
     setSelectedCourse(course);
+
+    // Set initial form state from course list data
     setEditCourseForm({
       title: course.title,
       description: course.description,
@@ -398,12 +402,27 @@ export default function AdminDashboardPage() {
       duration: course.duration,
       difficulty: course.difficulty,
       imageUrl: course.imageUrl || '',
+      lessons: [], // Will be populated below
     });
     setLocalPreview(course.imageUrl || null);
     setIsEditCourseModalOpen(true);
+
+    // Fetch full course details to get lessons
+    try {
+      const courseData = await getCourseById(course.id);
+      if (courseData) {
+        setEditCourseForm(prev => ({
+          ...prev,
+          lessons: courseData.lessons || []
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch full course details:', error);
+      toast.error('Failed to load course lessons');
+    }
   };
 
-  const handleUpdateCourse = async () => {
+  const handleUpdateCourse = async (lessons?: AddLessonPayload[]) => {
     if (!selectedCourse || !editCourseForm.title || !editCourseForm.description || !editCourseForm.category) {
       toast.error('Title, description, and category are required');
       return;
@@ -418,6 +437,7 @@ export default function AdminDashboardPage() {
         duration: editCourseForm.duration || 0,
         difficulty: editCourseForm.difficulty,
         imageUrl: editCourseForm.imageUrl || undefined,
+        lessons: lessons || editCourseForm.lessons,
       });
       toast.success('Course updated successfully');
       setIsEditCourseModalOpen(false);
@@ -511,7 +531,11 @@ export default function AdminDashboardPage() {
       async () => {
         try {
           const url = await getDownloadURL(task.snapshot.ref);
-          setCourseForm((prev) => ({ ...prev, imageUrl: url }));
+          if (isEditCourseModalOpen) {
+            setEditCourseForm((prev) => ({ ...prev, imageUrl: url }));
+          } else {
+            setCourseForm((prev) => ({ ...prev, imageUrl: url }));
+          }
           setLocalPreview(url);
           toast.success('Image uploaded');
         } catch (err) {
@@ -547,7 +571,11 @@ export default function AdminDashboardPage() {
       URL.revokeObjectURL(localPreview);
     }
     setLocalPreview(null);
-    setCourseForm((prev) => ({ ...prev, imageUrl: '' }));
+    if (isEditCourseModalOpen) {
+      setEditCourseForm((prev) => ({ ...prev, imageUrl: selectedCourse?.imageUrl || '' }));
+    } else {
+      setCourseForm((prev) => ({ ...prev, imageUrl: '' }));
+    }
     toast.info('Upload canceled');
   };
 
@@ -964,7 +992,8 @@ export default function AdminDashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                    title="Edit Course"
                     onClick={() => openEditCourseModal(course)}
                   >
                     <Edit className="h-4 w-4" />

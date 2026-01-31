@@ -51,20 +51,46 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
   const [genLevel, setGenLevel] = React.useState('beginner');
   const [genCount, setGenCount] = React.useState(5);
 
+  // Editing State
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+
   const handleNext = () => setStep(2);
   const handleBack = () => setStep(1);
 
-  const addLesson = () => {
+  const handleEditLesson = (lesson: AddLessonPayload, index: number) => {
+    setEditingIndex(index);
+    setNewLessonTitle(lesson.title);
+    setNewLessonContent(lesson.content);
+    setNewLessonDuration(lesson.duration || 15);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setNewLessonTitle('');
+    setNewLessonContent('');
+    setNewLessonDuration(15);
+  };
+
+  const addOrUpdateLesson = () => {
     if (!newLessonTitle || !newLessonContent) return;
 
-    const newLesson: AddLessonPayload = {
+    const lessonData: AddLessonPayload = {
       title: newLessonTitle,
       content: newLessonContent,
       duration: newLessonDuration,
-      order: lessons.length + 1
+      order: editingIndex !== null ? lessons[editingIndex].order : lessons.length + 1
     };
 
-    setLessons([...lessons, newLesson]);
+    if (editingIndex !== null) {
+      // Update existing
+      const updated = [...lessons];
+      updated[editingIndex] = lessonData;
+      setLessons(updated);
+      setEditingIndex(null); // Exit edit mode
+    } else {
+      // Add new
+      setLessons([...lessons, lessonData]);
+    }
 
     // Reset form
     setNewLessonTitle('');
@@ -75,6 +101,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
   const removeLesson = (index: number) => {
     const updated = lessons.filter((_, i) => i !== index).map((l, i) => ({ ...l, order: i + 1 }));
     setLessons(updated);
+    if (editingIndex === index) cancelEdit();
   };
 
   const handleJsonFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -178,6 +205,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
       setLessons([]);
       setNewLessonTitle('');
       setNewLessonContent('');
+      setEditingIndex(null);
     }
   }, [open]);
 
@@ -323,21 +351,24 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                   </div>
 
                   {isUploading && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex justify-between text-[10px] font-medium text-primary">
-                        <span>Uploading...</span>
-                        <span>{uploadProgress ?? 0}%</span>
+                    <div className="mt-3 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-medium text-primary">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Uploading... {uploadProgress || 0}%</span>
+                        </div>
+                        <button
+                          onClick={cancelUpload}
+                          className="text-red-500 hover:text-red-600 transition-colors uppercase tracking-wider font-bold text-[9px]"
+                        >
+                          Cancel
+                        </button>
                       </div>
-                      <div className="h-1 w-full bg-accent/10 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-accent/10 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{ width: `${uploadProgress ?? 0}%` }}
+                          className="h-full bg-primary transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress || 0}%` }}
                         />
-                      </div>
-                      <div className="flex gap-2 justify-end mt-1">
-                        <button onClick={pauseUpload} className="text-[10px] hover:text-primary transition-colors">Pause</button>
-                        <button onClick={resumeUpload} className="text-[10px] hover:text-primary transition-colors">Resume</button>
-                        <button onClick={cancelUpload} className="text-[10px] hover:text-red-500 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -351,7 +382,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                 <div className="p-3 bg-muted font-medium text-sm flex justify-between items-center">
                   <span>Curriculum ({lessons.length} Lessons)</span>
                 </div>
-                <ScrollArea className="flex-1 p-2 h-[200px] md:h-auto">
+                <ScrollArea className="flex-1 p-2 h-[450px]">
                   {lessons.length === 0 ? (
                     <div className="text-center p-8 text-muted-foreground text-sm flex flex-col items-center">
                       <BookOpen className="h-8 w-8 mb-2 opacity-50" />
@@ -361,13 +392,22 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                   ) : (
                     <div className="space-y-2">
                       {lessons.map((lesson, idx) => (
-                        <div key={idx} className="p-3 border rounded-md bg-card hover:bg-accent/50 transition-colors text-sm group relative">
+                        <div
+                          key={idx}
+                          onClick={() => handleEditLesson(lesson, idx)}
+                          className={`p-3 border rounded-md transition-colors text-sm group relative cursor-pointer
+                            ${editingIndex === idx ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-accent/50'}
+                          `}
+                        >
                           <div className="flex items-start justify-between">
                             <div className="font-medium text-foreground">
                               <span className="text-muted-foreground mr-2">{lesson.order}.</span>
                               {lesson.title}
                             </div>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeLesson(idx)}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
+                              e.stopPropagation();
+                              removeLesson(idx);
+                            }}>
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
@@ -389,39 +429,42 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
               <div className="md:w-2/3 flex flex-col space-y-4">
                 <div className="font-semibold flex items-center justify-between text-foreground">
                   <div className="flex items-center gap-2">
-                    {showImport ? <Upload className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                    {showImport ? 'Import Lessons (JSON)' : 'Add Lesson'}
+                    {showImport ? <Upload className="h-4 w-4" /> : editingIndex !== null ? <FileText className="h-4 w-4 text-primary" /> : <Plus className="h-4 w-4" />}
+                    {showImport ? 'Import Lessons (JSON)' : editingIndex !== null ? 'Edit Lesson' : 'Add Lesson'}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs font-normal"
-                    onClick={() => {
-                      setShowImport(!showImport);
-                      setImportError(null);
-                    }}
-                  >
-                    {showImport ? (
-                      <>
-                        <X className="h-3 w-3 mr-1" /> Cancel Import
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-3 w-3 mr-1" /> Import JSON
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs font-normal text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
-                    onClick={() => {
-                      setShowGenerator(true);
-                      setShowImport(false);
-                    }}
-                  >
-                    <Sparkles className="h-3 w-3 mr-1" /> AI Generate
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-normal"
+                      onClick={() => {
+                        setShowImport(!showImport);
+                        setImportError(null);
+                        setEditingIndex(null);
+                      }}
+                    >
+                      {showImport ? (
+                        <>
+                          <X className="h-3 w-3 mr-1" /> Cancel Import
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-3 w-3 mr-1" /> Import JSON
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs font-normal text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                      onClick={() => {
+                        setShowGenerator(true);
+                        setShowImport(false);
+                      }}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" /> AI Generate
+                    </Button>
+                  </div>
                 </div>
 
                 {showImport ? (
@@ -579,9 +622,16 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                       />
                     </div>
 
-                    <Button onClick={addLesson} disabled={!newLessonTitle || !newLessonContent} className="w-full h-9">
-                      Add Lesson
-                    </Button>
+                    <div className="flex gap-2">
+                      {editingIndex !== null && (
+                        <Button variant="outline" onClick={cancelEdit} className="flex-1 h-9">
+                          Cancel
+                        </Button>
+                      )}
+                      <Button onClick={addOrUpdateLesson} disabled={!newLessonTitle || !newLessonContent} className={`flex-1 h-9 ${editingIndex !== null ? 'gradient-bg-primary' : ''}`}>
+                        {editingIndex !== null ? 'Update Lesson' : 'Add Lesson'}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

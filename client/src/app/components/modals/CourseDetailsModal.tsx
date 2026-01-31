@@ -117,7 +117,12 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                                 </div>
                                 <div className="overflow-hidden">
                                     <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-tight">Duration</p>
-                                    <p className="text-xs font-bold truncate">{course.duration}m</p>
+                                    <p className="text-xs font-bold truncate">
+                                        {course.duration >= 60
+                                            ? `${Math.floor(course.duration / 60)}h${course.duration % 60 > 0 ? ` ${course.duration % 60}m` : ''}`
+                                            : `${course.duration}m`
+                                        }
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2.5 p-2 rounded-lg bg-accent/5">
@@ -170,12 +175,12 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                             ) : (
                                 <Button
                                     size="lg"
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-lg font-bold h-12"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-base font-bold h-12 flex items-center justify-center"
                                     onClick={onEnroll}
                                     disabled={isEnrolling}
                                 >
-                                    {isCompleted ? 'Review Course' : 'Continue Learning'}
-                                    {!isEnrolling && <BookOpen className="ml-2 h-5 w-5" />}
+                                    <span className="truncate">{isCompleted ? 'Review Course' : 'Continue'}</span>
+                                    {!isEnrolling && <BookOpen className="ml-2 h-4 w-4 shrink-0" />}
                                 </Button>
                             )}
 

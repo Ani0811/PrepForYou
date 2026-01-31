@@ -13,19 +13,18 @@ import {
 } from '../../api/courseApi';
 import { Button } from '../../components/ui/button';
 import { ScrollArea } from '../../components/ui/scroll-area';
-import { Separator } from '../../components/ui/separator';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import {
     BookOpen,
     CheckCircle,
-    Circle,
     ChevronLeft,
     Menu,
     Loader2,
     Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 export default function StudyPage() {
     const params = useParams();
@@ -152,23 +151,24 @@ export default function StudyPage() {
         <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
             {/* Sidebar - Lesson Navigation */}
             <div
-                className={`${sidebarOpen ? 'w-80' : 'w-0'
-                    } bg-card border-r border-border flex flex-col transition-all duration-300 relative z-20`}
+                className={`${sidebarOpen ? 'w-80 border-r' : 'w-0 border-r-0'
+                    } bg-background/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out relative z-20 shrink-0 border-border overflow-hidden`}
             >
-                <div className="p-4 border-b border-border bg-muted/20">
-                    <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground" onClick={() => router.push('/courses')}>
+                <div className="p-5 border-b border-border bg-card/50 min-w-[320px]">
+                    <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground hover:text-foreground transition-colors" onClick={() => router.push('/courses')}>
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Back to Courses
                     </Button>
-                    <h2 className="font-display font-bold text-lg leading-tight line-clamp-2">{course.title}</h2>
-                    <div className="mt-3 flex items-center gap-2">
-                        <Progress value={progressPercent} className="h-2 flex-1" />
-                        <span className="text-xs font-semibold text-muted-foreground">{progressPercent}%</span>
+                    <h2 className="font-display font-bold text-xl leading-tight line-clamp-2 mb-1">{course.title}</h2>
+                    <p className="text-xs text-muted-foreground mb-3">Track your progress</p>
+                    <div className="flex items-center gap-3">
+                        <Progress value={progressPercent} className="h-2.5 flex-1" />
+                        <span className="text-sm font-bold text-primary">{progressPercent}%</span>
                     </div>
                 </div>
 
                 <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-2">
+                    <div className="p-4 space-y-2.5 min-w-[320px]">
                         {lessons.map((lesson, index) => {
                             const isCompleted = completedLessonIds.has(lesson.id);
                             const isActive = activeLesson.id === lesson.id;
@@ -178,24 +178,29 @@ export default function StudyPage() {
                                     key={lesson.id}
                                     onClick={() => handleLessonSelect(lesson)}
                                     className={`
-                    group flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all border
+                    group flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all border-2
                     ${isActive
-                                            ? 'bg-primary/10 border-primary/20 shadow-sm'
-                                            : 'hover:bg-accent border-transparent hover:border-border'
+                                            ? 'bg-primary/10 border-primary/30 shadow-md shadow-primary/10'
+                                            : 'hover:bg-accent/50 border-transparent hover:border-border/50'
                                         }
                   `}
                                 >
-                                    <div className={`mt-0.5 ${isCompleted ? 'text-green-500' : isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                                        {isCompleted ? <CheckCircle className="h-5 w-5 fill-green-500/10" /> : <BookOpen className="h-5 w-5" />}
+                                    <div className={`mt-0.5 transition-transform ${isActive ? 'scale-110' : ''} ${isCompleted ? 'text-green-500' : isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                                        {isCompleted ? <CheckCircle className="h-5 w-5 fill-green-500/20" /> : <BookOpen className="h-5 w-5" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-sm font-medium leading-tight ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                                        <p className={`text-sm font-semibold leading-tight mb-1.5 ${isActive ? 'text-primary' : 'text-foreground'}`}>
                                             {index + 1}. {lesson.title}
                                         </p>
-                                        <div className="flex items-center gap-2 mt-1.5">
-                                            <span className="text-[10px] text-muted-foreground bg-accent/50 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-muted-foreground bg-accent px-2 py-1 rounded-md uppercase tracking-wide font-bold">
                                                 {lesson.duration} min
                                             </span>
+                                            {isCompleted && (
+                                                <span className="text-[9px] text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-wide font-bold">
+                                                    ✓ Done
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -241,53 +246,95 @@ export default function StudyPage() {
                 )}
 
 
-                <ScrollArea className="flex-1 h-full">
-                    <div className="max-w-4xl mx-auto p-6 md:p-10 space-y-8 pb-32">
+                <div className="flex-1 overflow-y-auto h-full scrollbar-gutter-stable">
+                    <div className="max-w-4xl mx-auto p-6 md:p-12 space-y-10 pb-32">
 
                         {/* Header */}
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="outline" className="text-muted-foreground border-border">
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2.5">
+                                <Badge variant="outline" className="text-xs font-bold px-3 py-1 border-primary/30 text-primary bg-primary/5">
                                     Lesson {activeLesson.order}
                                 </Badge>
                                 {completedLessonIds.has(activeLesson.id) && (
-                                    <Badge variant="secondary" className="bg-green-500/10 text-green-600 hover:bg-green-500/20">
-                                        Completed
+                                    <Badge variant="secondary" className="text-xs font-bold px-3 py-1 bg-green-500/10 text-green-600 border border-green-500/20">
+                                        ✓ Completed
                                     </Badge>
                                 )}
                             </div>
-                            <h1 className="text-3xl font-display font-bold text-foreground">
+                            <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground leading-tight">
                                 {activeLesson.title}
                             </h1>
+                            <div className="h-1 w-20 bg-gradient-to-r from-primary to-primary/30 rounded-full" />
                         </div>
+
 
                         {/* Text Content */}
                         <div className="prose dark:prose-invert max-w-none">
-                            <div className="whitespace-pre-wrap font-sans text-lg leading-relaxed text-muted-foreground">
-                                {activeLesson.content}
+                            <div className="font-sans text-lg md:text-xl leading-relaxed text-foreground/90 bg-card/30 p-8 rounded-2xl border border-border/50">
+                                <ReactMarkdown
+                                    components={{
+                                        h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mt-8 mb-4 font-display" {...props} />,
+                                        h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mt-6 mb-3 font-display" {...props} />,
+                                        h3: ({ node, ...props }) => <h3 className="text-xl font-bold mt-5 mb-2 font-display" {...props} />,
+                                        p: ({ node, ...props }) => <p className="mb-4 leading-relaxed" {...props} />,
+                                        ul: ({ node, ...props }) => <ul className="list-disc pl-6 mb-4 space-y-2" {...props} />,
+                                        ol: ({ node, ...props }) => <ol className="list-decimal pl-6 mb-4 space-y-2" {...props} />,
+                                        li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                                        code: ({ node, className, children, ...props }: any) => {
+                                            const match = /language-(\w+)/.exec(className || '')
+                                            return !Number(match) ? (
+                                                <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-primary" {...props}>
+                                                    {children}
+                                                </code>
+                                            ) : (
+                                                <div className="rounded-lg overflow-hidden my-6 border border-border">
+                                                    <div className="bg-muted px-4 py-2 text-xs font-mono text-muted-foreground border-b border-border">
+                                                        {match?.[1] || 'code'}
+                                                    </div>
+                                                    <code className="block bg-background p-4 text-sm font-mono overflow-x-auto" {...props}>
+                                                        {children}
+                                                    </code>
+                                                </div>
+                                            )
+                                        },
+                                        blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-primary/50 pl-4 italic my-6 text-muted-foreground bg-primary/5 py-2 pr-2 rounded-r" {...props} />,
+                                    }}
+                                >
+                                    {activeLesson.content}
+                                </ReactMarkdown>
                             </div>
                         </div>
 
                     </div>
-                </ScrollArea>
+                </div>
 
                 {/* Bottom Action Bar */}
-                <div className="border-t border-border p-4 bg-background/80 backdrop-blur-xl absolute bottom-0 left-0 right-0 z-10 flex justify-between items-center max-w-none">
-                    <div className="hidden md:block text-sm text-muted-foreground">
-                        {completedLessonIds.has(activeLesson.id) ? "You've completed this lesson." : "Mark as complete to continue."}
+                <div className="border-t border-border p-5 bg-background/95 backdrop-blur-xl absolute bottom-0 left-0 right-0 z-10 flex justify-between items-center max-w-none shadow-2xl">
+                    <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className={`w-2 h-2 rounded-full ${completedLessonIds.has(activeLesson.id) ? 'bg-green-500' : 'bg-primary'} animate-pulse`} />
+                        {completedLessonIds.has(activeLesson.id) ? "You've completed this lesson!" : "Mark as complete to unlock the next lesson"}
                     </div>
-                    <div className="flex gap-4 ml-auto">
-                        <Button variant="outline" onClick={() => {
-                            const currIdx = lessons.findIndex(l => l.id === activeLesson.id);
-                            if (currIdx > 0) setActiveLesson(lessons[currIdx - 1]);
-                        }} disabled={lessons.findIndex(l => l.id === activeLesson.id) === 0}>
+                    <div className="flex gap-3 ml-auto w-full md:w-auto">
+                        <Button
+                            variant="outline"
+                            className="flex-1 md:flex-none font-semibold"
+                            onClick={() => {
+                                const currIdx = lessons.findIndex(l => l.id === activeLesson.id);
+                                if (currIdx > 0) setActiveLesson(lessons[currIdx - 1]);
+                            }}
+                            disabled={lessons.findIndex(l => l.id === activeLesson.id) === 0}
+                        >
+                            <ChevronLeft className="mr-2 h-4 w-4" />
                             Previous
                         </Button>
 
                         <Button
                             onClick={handleCompleteLesson}
                             disabled={isCompleting}
-                            className={completedLessonIds.has(activeLesson.id) ? "bg-accent hover:bg-accent/80 text-foreground" : "gradient-bg-primary shadow-lg shadow-primary/20"}
+                            className={`flex-1 md:flex-none font-bold text-base px-6 ${completedLessonIds.has(activeLesson.id)
+                                ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
+                                : "gradient-bg-primary shadow-lg shadow-primary/30"
+                                }`}
                         >
                             {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {completedLessonIds.has(activeLesson.id) ? 'Next Lesson' : 'Complete & Continue'}
