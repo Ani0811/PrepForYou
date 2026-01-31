@@ -1,15 +1,13 @@
-import express, { Request, Response } from 'express'
-import cors from 'cors'
-import dotenv from 'dotenv'
-import prisma from './db/prisma'
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express, { Request, Response } from 'express';
+import cors from 'cors';
 
 // Import routes
-import userRoutes from './routes/user.routes'
-import courseRoutes from './routes/course.routes'
-import adminRoutes from './routes/admin.routes'
-
-// Load environment variables
-dotenv.config()
+import userRoutes from './routes/user.routes';
+import courseRoutes from './routes/course.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express()
 const PORT = process.env.PORT || 3001

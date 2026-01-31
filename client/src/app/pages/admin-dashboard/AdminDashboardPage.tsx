@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
+import { Switch } from '../../components/ui/switch';
 import {
   Table,
   TableBody,
@@ -56,6 +57,7 @@ import {
   CreateCourseModal,
   EditCourseModal,
   DeleteCourseModal,
+  ManageLessonsModal,
 } from '../../components/modals';
 
 // Import API functions
@@ -71,7 +73,9 @@ import {
   getAllCourses,
   createCourse as createCourseApi,
   updateCourse as updateCourseApi,
-  deleteCourse as deleteCourseApi
+  deleteCourse as deleteCourseApi,
+  toggleCoursePublishStatus,
+  AddLessonPayload
 } from '../../api/courseApi';
 
 interface User {
@@ -145,6 +149,7 @@ export default function AdminDashboardPage() {
   const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
   const [isEditCourseModalOpen, setIsEditCourseModalOpen] = useState(false);
   const [isDeleteCourseModalOpen, setIsDeleteCourseModalOpen] = useState(false);
+  const [isManageLessonsModalOpen, setIsManageLessonsModalOpen] = useState(false);
 
   // Selected for actions
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -348,7 +353,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleCreateCourse = async () => {
+  const handleCreateCourse = async (lessons?: AddLessonPayload[]) => {
     if (!courseForm.title || !courseForm.description || !courseForm.category) {
       toast.error('Title, description, and category are required');
       return;
@@ -363,6 +368,7 @@ export default function AdminDashboardPage() {
         duration: courseForm.duration || 0,
         difficulty: courseForm.difficulty,
         imageUrl: courseForm.imageUrl || undefined,
+        lessons: lessons
       });
       toast.success('Course created successfully');
       setIsCreateCourseModalOpen(false);
@@ -430,6 +436,11 @@ export default function AdminDashboardPage() {
     setIsDeleteCourseModalOpen(true);
   };
 
+  const openManageLessonsModal = (course: Course) => {
+    setSelectedCourse(course);
+    setIsManageLessonsModalOpen(true);
+  };
+
   const handleDeleteCourse = async () => {
     if (!selectedCourse) return;
 
@@ -445,6 +456,25 @@ export default function AdminDashboardPage() {
       toast.error(error.message || 'Failed to delete course');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTogglePublish = async (course: Course) => {
+    try {
+      const newStatus = !course.isPublished;
+      // Optimistic update
+      setCourses(prev => prev.map(c => c.id === course.id ? { ...c, isPublished: newStatus } : c));
+
+      await toggleCoursePublishStatus(course.id, newStatus);
+
+      const statusText = newStatus ? 'published' : 'unpublished';
+      toast.success(`Course ${statusText} successfully`);
+    } catch (error: any) {
+      // Revert optimism if failed
+      setCourses(prev => prev.map(c => c.id === course.id ? { ...c, isPublished: !course.isPublished } : c));
+
+      console.error('Error toggling publish status:', error);
+      toast.error(error.message || 'Failed to update publish status');
     }
   };
 
@@ -902,6 +932,18 @@ export default function AdminDashboardPage() {
                 )}
                 <CardContent className="p-4">
                   <h3 className="font-display font-semibold text-lg mb-2">{course.title}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={course.isPublished}
+                        onCheckedChange={() => handleTogglePublish(course)}
+                        aria-label="Toggle publish status"
+                      />
+                      <span className={`text-xs font-medium ${course.isPublished ? 'text-green-500' : 'text-muted-foreground'}`}>
+                        {course.isPublished ? 'Published' : 'Draft'}
+                      </span>
+                    </div>
+                  </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{course.description}</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary">{course.category}</Badge>
@@ -910,6 +952,15 @@ export default function AdminDashboardPage() {
                   </div>
                 </CardContent>
                 <div className="flex items-center justify-end gap-2 p-4 pt-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                    onClick={() => openManageLessonsModal(course)}
+                    title="Manage Lessons"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1028,6 +1079,13 @@ export default function AdminDashboardPage() {
         selectedCourse={selectedCourse}
         onDelete={handleDeleteCourse}
         isSaving={isSaving}
+      />
+
+      <ManageLessonsModal
+        open={isManageLessonsModalOpen}
+        onOpenChange={setIsManageLessonsModalOpen}
+        courseId={selectedCourse?.id || null}
+        courseTitle={selectedCourse?.title || ''}
       />
     </div>
   );

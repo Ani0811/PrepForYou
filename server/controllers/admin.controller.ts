@@ -256,6 +256,18 @@ export const toggleCoursePublished = async (req: Request, res: Response) => {
       });
     }
 
+    if (isPublished) {
+      const lessonCount = await prisma.lesson.count({
+        where: { courseId },
+      });
+
+      if (lessonCount === 0) {
+        return res.status(400).json({
+          error: 'Cannot publish a course with no lessons. Please add lessons first.'
+        });
+      }
+    }
+
     const course = await prisma.course.update({
       where: { id: courseId },
       data: { isPublished },
@@ -637,6 +649,19 @@ export const updateCourse = async (req: Request, res: Response) => {
 
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // specific check if publishing
+    if (isPublished === true) {
+      const lessonCount = await prisma.lesson.count({
+        where: { courseId },
+      });
+
+      if (lessonCount === 0) {
+        return res.status(400).json({
+          error: 'Cannot publish a course with no lessons. Please add lessons first.'
+        });
+      }
     }
 
     // Update course

@@ -27,18 +27,18 @@ export default function EditCourseModal({ open, onOpenChange, editCourseForm, se
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="sm:max-w-2xl! w-full fixed top-[55%]! flex flex-col rounded-xl border border-border shadow-2xl p-0 overflow-hidden z-[60]"
+                className="sm:max-w-4xl! w-full max-h-[90vh] fixed top-[55%]! flex flex-col rounded-2xl border border-border shadow-2xl p-0 overflow-hidden z-[60]"
                 style={{ backgroundColor: 'oklch(var(--background))' }}
             >
-                <DialogHeader className="flex-none p-5 pb-0">
+                <DialogHeader className="flex-none p-8 pb-2">
                     <DialogTitle className="text-2xl font-display font-bold gradient-text">Edit Course</DialogTitle>
                     <DialogDescription className="text-muted-foreground mt-1">
                         Update the details of your course below.
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-8 flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-1">
                         {/* Left Column: Core Info */}
                         <div className="space-y-5">
                             <div className="space-y-1.5">
@@ -75,7 +75,7 @@ export default function EditCourseModal({ open, onOpenChange, editCourseForm, se
                                             <SelectValue placeholder="Select" />
                                         </SelectTrigger>
                                         <SelectContent
-                                            className="border-border z-[70]! opacity-100! shadow-2xl"
+                                            className="border-border z-[100]! opacity-100! shadow-2xl"
                                             style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                                         >
                                             <SelectItem value="Programming">Programming</SelectItem>
@@ -97,7 +97,7 @@ export default function EditCourseModal({ open, onOpenChange, editCourseForm, se
                                             <SelectValue placeholder="Select" />
                                         </SelectTrigger>
                                         <SelectContent
-                                            className="border-border z-[70]! opacity-100! shadow-2xl"
+                                            className="border-border z-[100]! opacity-100! shadow-2xl"
                                             style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                                         >
                                             <SelectItem value="beginner">Beginner</SelectItem>
@@ -186,7 +186,7 @@ export default function EditCourseModal({ open, onOpenChange, editCourseForm, se
                     </div>
                 </div>
 
-                <DialogFooter className="flex-none p-5 pt-4 border-t border-border bg-background/50">
+                <DialogFooter className="flex-none p-8 pt-4 border-t border-border bg-background/50">
                     <Button
                         variant="outline"
                         className="hover:bg-accent"

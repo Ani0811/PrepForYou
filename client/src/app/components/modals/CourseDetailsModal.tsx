@@ -4,7 +4,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2, PlayCircle } from 'lucide-react';
+import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2 } from 'lucide-react';
 import { CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
 
@@ -165,15 +165,17 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                                     disabled={isEnrolling}
                                 >
                                     {isEnrolling ? 'Enrolling...' : 'Apply Now'}
-                                    {!isEnrolling && <PlayCircle className="ml-2 h-5 w-5" />}
+                                    {!isEnrolling && <BookOpen className="ml-2 h-5 w-5" />}
                                 </Button>
                             ) : (
                                 <Button
                                     size="lg"
                                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-lg font-bold h-12"
-                                    disabled={true}
+                                    onClick={onEnroll}
+                                    disabled={isEnrolling}
                                 >
-                                    {isCompleted ? 'Completed' : 'Enrolled'}
+                                    {isCompleted ? 'Review Course' : 'Continue Learning'}
+                                    {!isEnrolling && <BookOpen className="ml-2 h-5 w-5" />}
                                 </Button>
                             )}
 

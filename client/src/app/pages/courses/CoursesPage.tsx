@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
@@ -14,6 +15,7 @@ import { toast } from 'sonner';
 import { CourseDetailsModal } from '../../components/modals';
 
 export default function CoursesPage() {
+  const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,6 +95,13 @@ export default function CoursesPage() {
   const handleEnroll = async () => {
     if (!selectedCourse || !user) return;
 
+    // If already enrolled, just redirect
+    if (selectedCourse.status !== 'not-started') {
+      setIsDetailsModalOpen(false);
+      router.push(`/learn?courseId=${selectedCourse.id}`);
+      return;
+    }
+
     setIsEnrolling(true);
     try {
       await updateCourseProgress(selectedCourse.id, user.uid, {
@@ -102,10 +111,7 @@ export default function CoursesPage() {
 
       toast.success('Successfully enrolled!');
       setIsDetailsModalOpen(false);
-
-      // Refresh courses to show updated status
-      await fetchCourses(user.uid, selectedCategory === 'All' ? undefined : selectedCategory);
-      fetchRecommendedCourses(user.uid);
+      router.push(`/learn?courseId=${selectedCourse.id}`);
     } catch (error: any) {
       console.error('Error enrolling in course:', error);
       toast.error('Failed to enroll in course');

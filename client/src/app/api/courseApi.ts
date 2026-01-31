@@ -19,6 +19,15 @@ async function parseErrorResponse(response: Response) {
   };
 }
 
+export interface Lesson {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  duration: number;
+  courseId: string;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -31,6 +40,7 @@ export interface Course {
   createdAt?: string;
   updatedAt?: string;
   isActive?: boolean;
+  lessons?: Lesson[];
 }
 
 export interface CourseWithProgress extends Course {
@@ -49,11 +59,25 @@ export interface CreateCoursePayload {
   imageUrl?: string;
   tags?: string[];
   difficulty?: string;
+  lessons?: AddLessonPayload[];
 }
 
 export interface UpdateProgressPayload {
   progress?: number;
   status?: string;
+}
+
+export interface AddLessonPayload {
+  title: string;
+  content: string;
+  order: number;
+  duration?: number;
+}
+
+export interface GenerateContentPayload {
+  topic: string;
+  level: string;
+  count: number;
 }
 
 /**
@@ -235,6 +259,83 @@ export async function createCourse(payload: CreateCoursePayload): Promise<Course
 }
 
 /**
+ * Add a lesson to a course
+ */
+export async function addLesson(courseId: string, payload: AddLessonPayload): Promise<Lesson> {
+  const response = await fetch(`${API_URL}/courses/${courseId}/lessons`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to add lesson';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/courses/${courseId}/lessons`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.lesson;
+}
+
+/**
+ * Complete a lesson
+ */
+export async function completeLesson(courseId: string, lessonId: string, firebaseUid: string): Promise<any> {
+  const response = await fetch(`${API_URL}/courses/${courseId}/lessons/${lessonId}/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ firebaseUid }),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to complete lesson';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/courses/${courseId}/lessons/${lessonId}/complete`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Get detailed course progress
+ */
+export async function getCourseProgressDetails(courseId: string, firebaseUid: string): Promise<{ percent: number; status: string; completedLessons: string[] } | null> {
+  const response = await fetch(`${API_URL}/courses/${courseId}/progress/${firebaseUid}/details`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to fetch course progress details';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/courses/${courseId}/progress/${firebaseUid}/details`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.progress;
+}
+
+/**
  * Update a course (admin only)
  */
 export async function updateCourse(courseId: string, payload: Partial<CreateCoursePayload>): Promise<Course> {
@@ -281,3 +382,55 @@ export async function deleteCourse(courseId: string): Promise<void> {
     throw new Error(errMsg);
   }
 }
+
+/**
+ * Toggle course publish status (admin only)
+ */
+export async function toggleCoursePublishStatus(courseId: string, isPublished: boolean): Promise<Course> {
+  const response = await fetch(`${API_URL}/admin/courses/${courseId}/publish`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ isPublished }),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to toggle publish status';
+    // Throw error with message for UI to display (e.g. "Cannot publish empty course")
+    throw new Error(msg);
+  }
+
+  const data = await response.json();
+  return data.course;
+}
+
+/**
+ * Generate content using AI
+ */
+export async function generateCourseContent(payload: GenerateContentPayload): Promise<{ lessons: AddLessonPayload[] }> {
+  const response = await fetch(`${API_URL}/courses/generate-content`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to generate content';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/courses/generate-content`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return data.data;
+}
+

@@ -50,12 +50,31 @@ model Course {
   isActive            Boolean   @default(true) @map("is_active")
 
   courseProgress      CourseProgress[]
+  lessons             Lesson[]
 
   @@index([category])
   @@index([difficulty])
   @@index([createdAt])
   @@index([isPublished])
   @@map("courses")
+}
+
+model Lesson {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  content     String   @db.Text
+  order       Int
+  duration    Int      @default(0) // Duration in minutes
+  courseId    String   @map("course_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress LessonProgress[]
+
+  @@index([courseId])
+  @@index([order])
+  @@map("lessons")
 }
 
 model CourseProgress {
@@ -72,10 +91,29 @@ model CourseProgress {
 
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   course              Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress      LessonProgress[]
 
   @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
   @@index([status])
   @@map("course_progress")
+}
+
+model LessonProgress {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lessonId         String         @map("lesson_id") @db.Uuid
+  courseProgressId String         @map("course_progress_id") @db.Uuid
+  isCompleted      Boolean        @default(false) @map("is_completed")
+  completedAt      DateTime?      @map("completed_at") @db.Timestamptz
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  lesson           Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  courseProgress   CourseProgress @relation(fields: [courseProgressId], references: [id], onDelete: Cascade)
+
+  @@unique([courseProgressId, lessonId])
+  @@index([courseProgressId])
+  @@index([lessonId])
+  @@map("lesson_progress")
 }
