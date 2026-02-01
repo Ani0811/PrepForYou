@@ -251,10 +251,23 @@ export default function AdminDashboardPage() {
     try {
       const data = await getUsers();
       setUsers(data.users);
+      // Consider a user "active" if they signed in within the last 24 hours
+      const now = Date.now();
+      const activeWithinMs = 24 * 60 * 60 * 1000;
+      const activeCount = data.users.filter((u: User) => {
+        if (!u.lastSignInAt) return false;
+        try {
+          const t = new Date(u.lastSignInAt).getTime();
+          return !isNaN(t) && (now - t) <= activeWithinMs;
+        } catch {
+          return false;
+        }
+      }).length;
+
       setStats(prev => ({
         ...prev,
         totalUsers: data.users.length,
-        activeUsers: data.users.filter((u: User) => u.isActive).length,
+        activeUsers: activeCount,
       }));
     } catch (error: any) {
       console.error('Error loading users:', error);
@@ -744,7 +757,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-display font-bold gradient-text">
-              {courses.length > 0 ? Math.round(courses.reduce((sum, c) => sum + c.duration, 0) / courses.length) : 0}h
+              {courses.length > 0 ? ((courses.reduce((sum, c) => sum + c.duration, 0) / courses.length) / 60).toFixed(1) + 'h' : '0h'}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Per course
