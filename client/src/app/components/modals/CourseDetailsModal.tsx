@@ -1,7 +1,6 @@
 "use client";
 
-import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2 } from 'lucide-react';
@@ -36,7 +35,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 showCloseButton={false}
-                className="sm:max-w-2xl! top-[55%]! p-0 overflow-hidden border-0 gap-0 z-[60]"
+                className="sm:max-w-2xl! top-[55%]! p-0 overflow-hidden border-0 gap-0 z-60"
                 style={{ backgroundColor: 'oklch(var(--background))' }}
             >
                 {/* Banner Image */}
@@ -48,12 +47,12 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                             className="w-full h-full object-cover"
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+                        <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
                             <BookOpen className="h-12 w-12 text-primary/40" />
                         </div>
                     )}
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent" />
 
                     <div className="absolute bottom-4 left-6 right-6">
                         <div className="flex flex-wrap gap-2 mb-2">

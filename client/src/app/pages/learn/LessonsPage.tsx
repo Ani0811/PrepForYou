@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { auth } from '../../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -20,8 +20,7 @@ import {
     CheckCircle,
     ChevronLeft,
     Menu,
-    Loader2,
-    Lock
+    Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -264,7 +263,7 @@ export default function StudyPage() {
                             <h1 className="text-4xl md:text-5xl font-display font-bold text-foreground leading-tight">
                                 {activeLesson.title}
                             </h1>
-                            <div className="h-1 w-20 bg-gradient-to-r from-primary to-primary/30 rounded-full" />
+                            <div className="h-1 w-20 bg-linear-to-r from-primary to-primary/30 rounded-full" />
                         </div>
 
 
@@ -287,13 +286,29 @@ export default function StudyPage() {
                                                     {children}
                                                 </code>
                                             ) : (
-                                                <div className="rounded-lg overflow-hidden my-6 border border-border">
-                                                    <div className="bg-muted px-4 py-2 text-xs font-mono text-muted-foreground border-b border-border">
-                                                        {match?.[1] || 'code'}
+                                                <div className="rounded-xl overflow-hidden my-6 shadow-2xl border border-border/50 bg-linear-to-br from-slate-900 to-slate-950 dark:from-slate-950 dark:to-black">
+                                                    {/* macOS-style window header */}
+                                                    <div className="flex items-center justify-between px-4 py-3 bg-linear-to-r from-slate-800 to-slate-900 dark:from-slate-900 dark:to-black border-b border-slate-700/50">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex gap-1.5">
+                                                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
+                                                                <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm" />
+                                                                <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm" />
+                                                            </div>
+                                                            <span className="text-xs font-medium text-slate-400 ml-2">
+                                                                {match?.[1] || 'code'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 font-mono">
+                                                            {match?.[1] ? `script.${match[1]}` : 'untitled'}
+                                                        </div>
                                                     </div>
-                                                    <code className="block bg-background p-4 text-sm font-mono overflow-x-auto" {...props}>
-                                                        {children}
-                                                    </code>
+                                                    {/* Code content */}
+                                                    <pre className="m-0! p-0! bg-transparent!">
+                                                        <code className="block p-6 text-sm font-mono overflow-x-auto bg-transparent! text-slate-100 dark:text-slate-200 leading-relaxed" {...props}>
+                                                            {children}
+                                                        </code>
+                                                    </pre>
                                                 </div>
                                             )
                                         },
@@ -332,7 +347,7 @@ export default function StudyPage() {
                             onClick={handleCompleteLesson}
                             disabled={isCompleting}
                             className={`flex-1 md:flex-none font-bold text-base px-6 ${completedLessonIds.has(activeLesson.id)
-                                ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
+                                ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
                                 : "gradient-bg-primary shadow-lg shadow-primary/30"
                                 }`}
                         >

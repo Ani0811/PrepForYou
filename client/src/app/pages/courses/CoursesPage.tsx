@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Progress } from '../../components/ui/progress';
-import { BookOpen, Clock, Award, Sparkles, Star } from 'lucide-react';
+import { BookOpen, Clock, Award } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
@@ -167,7 +166,7 @@ export default function CoursesPage() {
             {isLoading ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Card key={i} className="animate-pulse bg-card/30 backdrop-blur-sm border-2 border-border/50 rounded-2xl h-[340px]">
+                  <Card key={i} className="animate-pulse bg-card/30 backdrop-blur-sm border-2 border-border/50 rounded-2xl h-85">
                     <CardHeader className="p-6">
                       <div className="w-12 h-12 bg-muted/50 rounded-xl mb-3" />
                       <div className="h-6 bg-muted/50 rounded-lg w-3/4" />
@@ -183,7 +182,7 @@ export default function CoursesPage() {
                 ))}
               </div>
             ) : getCoursesByCategory(category).length === 0 ? (
-              <Card className="backdrop-blur-xl bg-card/20 border-2 border-dashed border-border/50 rounded-[32px] overflow-hidden">
+              <Card className="backdrop-blur-xl bg-card/20 border-2 border-dashed border-border/50 rounded-4xl overflow-hidden">
                 <CardContent className="flex flex-col items-center justify-center py-24 text-center">
                   <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
                     <BookOpen className="h-10 w-10 text-primary" />
@@ -202,11 +201,11 @@ export default function CoursesPage() {
                       className="group relative flex flex-col h-full bg-card/40 backdrop-blur-xl border-2 border-border/50 rounded-[28px] overflow-hidden transition-all duration-500 hover:border-primary/50 hover:shadow-xl hover:-translate-y-2"
                       onClick={() => openCourseDetails(course)}
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                       <CardHeader className="relative p-6 pb-3">
                         <div className="flex items-center justify-between mb-4">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg border border-primary/20">
+                          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg border border-primary/20">
                             <BookOpen className="h-6 w-6 text-primary" />
                           </div>
                           <Badge
@@ -252,7 +251,7 @@ export default function CoursesPage() {
                           </div>
 
                           <Button
-                            className="w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 gradient-bg-primary hover:shadow-lg group-hover:translate-y-[-2px] active:scale-95"
+                            className="w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 gradient-bg-primary hover:shadow-lg group-hover:translate-y-0.5 active:scale-95"
                             onClick={(e) => {
                               e.stopPropagation();
                               openCourseDetails(course);

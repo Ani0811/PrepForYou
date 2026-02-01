@@ -1,6 +1,5 @@
 "use client";
 
-import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -22,7 +21,7 @@ export default function ReportUserModal({ open, onOpenChange, selectedUser, repo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-[60] overflow-hidden p-0"
+        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-60 overflow-hidden p-0"
         style={{ backgroundColor: 'oklch(var(--background))' }}
       >
         <DialogHeader className="p-6 pb-0">
@@ -52,7 +51,7 @@ export default function ReportUserModal({ open, onOpenChange, selectedUser, repo
                   <SelectValue placeholder="Select a reason" />
                 </SelectTrigger>
                 <SelectContent
-                  className="border-border z-[70]! opacity-100! shadow-2xl"
+                  className="border-border z-70! opacity-100! shadow-2xl"
                   style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                 >
                   <SelectItem value="spam">Spam</SelectItem>

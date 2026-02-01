@@ -967,16 +967,20 @@ export default function AdminDashboardPage() {
                         onCheckedChange={() => handleTogglePublish(course)}
                         aria-label="Toggle publish status"
                       />
-                      <span className={`text-xs font-medium ${course.isPublished ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {course.isPublished ? 'Published' : 'Draft'}
-                      </span>
+                      {course.isPublished && (
+                        <Badge variant="secondary" className="text-xs">Published</Badge>
+                      )}
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{course.description}</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary">{course.category}</Badge>
                     <Badge variant="outline">{course.difficulty}</Badge>
-                    <Badge variant="outline">{course.duration}h</Badge>
+                    <Badge variant="outline">
+                      {course.duration >= 60
+                        ? `${Math.floor(course.duration / 60)}h${course.duration % 60 > 0 ? ` ${course.duration % 60}m` : ''}`
+                        : `${course.duration}m`}
+                    </Badge>
                   </div>
                 </CardContent>
                 <div className="flex items-center justify-end gap-2 p-4 pt-0">
@@ -987,7 +991,7 @@ export default function AdminDashboardPage() {
                     onClick={() => openManageLessonsModal(course)}
                     title="Manage Lessons"
                   >
-                    <BookOpen className="h-4 w-4" />
+                    <span className="sr-only">Manage Lessons</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -1115,6 +1119,7 @@ export default function AdminDashboardPage() {
         onOpenChange={setIsManageLessonsModalOpen}
         courseId={selectedCourse?.id || null}
         courseTitle={selectedCourse?.title || ''}
+        courseDifficulty={selectedCourse?.difficulty || 'beginner'}
       />
     </div>
   );

@@ -24,7 +24,7 @@ export default function EditUserModal({ open, onOpenChange, editForm, setEditFor
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-[60] overflow-hidden p-0"
+        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-60 overflow-hidden p-0"
         style={{ backgroundColor: 'oklch(var(--background))' }}
       >
         <DialogHeader className="p-6 pb-0">

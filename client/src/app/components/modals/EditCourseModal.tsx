@@ -37,8 +37,7 @@ interface Props {
 export default function EditCourseModal({
     open, onOpenChange, editCourseForm, setEditCourseForm,
     fileInputRef, handleFileUpload, isUploading, uploadProgress,
-    localPreview, cancelUpload, pauseUpload, resumeUpload,
-    handleUpdateCourse, isSaving
+    localPreview, cancelUpload, handleUpdateCourse, isSaving
 }: Props) {
     const [step, setStep] = React.useState(1);
     const [lessons, setLessons] = React.useState<AddLessonPayload[]>([]);
@@ -214,7 +213,7 @@ export default function EditCourseModal({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className="sm:max-w-4xl! w-full max-h-[90vh] fixed top-[55%]! flex flex-col rounded-2xl border border-border shadow-2xl p-0 overflow-hidden z-[60]"
+                className="sm:max-w-4xl! w-full max-h-[90vh] fixed top-[55%]! flex flex-col rounded-2xl border border-border shadow-2xl p-0 overflow-hidden z-60"
                 style={{ backgroundColor: 'oklch(var(--background))' }}
             >
                 <DialogHeader className="flex-none p-8 pb-2">
@@ -246,7 +245,7 @@ export default function EditCourseModal({
                                 <div className="space-y-1.5 text-foreground!">
                                     <Label className="text-sm font-medium text-foreground">Description <span className="text-red-500">*</span></Label>
                                     <textarea
-                                        className="flex min-h-[140px] w-full rounded-md border border-input bg-accent/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:bg-accent/10 text-foreground"
+                                        className="flex min-h-35 w-full rounded-md border border-input bg-accent/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:bg-accent/10 text-foreground"
                                         placeholder="What will students learn in this course?"
                                         value={editCourseForm.description}
                                         onChange={(e) => setEditCourseForm({ ...editCourseForm, description: e.target.value })}
@@ -267,7 +266,7 @@ export default function EditCourseModal({
                                                 <SelectValue placeholder="Select" />
                                             </SelectTrigger>
                                             <SelectContent
-                                                className="border-border z-[100]! opacity-100! shadow-2xl"
+                                                className="border-border z-100! opacity-100! shadow-2xl"
                                                 style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                                             >
                                                 <SelectItem value="Programming">Programming</SelectItem>
@@ -289,7 +288,7 @@ export default function EditCourseModal({
                                                 <SelectValue placeholder="Select" />
                                             </SelectTrigger>
                                             <SelectContent
-                                                className="border-border z-[100]! opacity-100! shadow-2xl"
+                                                className="border-border z-100! opacity-100! shadow-2xl"
                                                 style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                                             >
                                                 <SelectItem value="beginner">Beginner</SelectItem>
@@ -379,13 +378,13 @@ export default function EditCourseModal({
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col md:flex-row gap-8 h-full overflow-hidden min-h-[500px]">
+                        <div className="flex flex-col md:flex-row gap-8 h-full overflow-hidden min-h-125">
                             {/* Left: Lessons List */}
                             <div className="md:w-1/3 flex flex-col border rounded-md">
                                 <div className="p-3 bg-muted font-medium text-sm flex justify-between items-center">
                                     <span>Curriculum ({lessons.length} Lessons)</span>
                                 </div>
-                                <ScrollArea className="flex-1 p-2 h-[450px]">
+                                <ScrollArea className="flex-1 p-2 h-112.5">
                                     {lessons.length === 0 ? (
                                         <div className="text-center p-8 text-muted-foreground text-sm flex flex-col items-center">
                                             <BookOpen className="h-8 w-8 mb-2 opacity-50" />
@@ -657,13 +656,13 @@ export default function EditCourseModal({
                                                     <Textarea
                                                         id="lesson-content-textarea"
                                                         placeholder="Enter content..."
-                                                        className="flex-1 min-h-[120px] bg-accent/5 font-mono text-xs rounded-t-none"
+                                                        className="flex-1 min-h-30] bg-accent/5 font-mono text-xs rounded-t-none"
                                                         value={newLessonContent}
                                                         onChange={(e) => setNewLessonContent(e.target.value)}
                                                     />
                                                 </div>
                                             ) : (
-                                                <div className="flex-1 min-h-[120px] bg-accent/5 rounded-md border p-3 overflow-y-auto prose prose-sm dark:prose-invert max-w-none">
+                                                <div className="flex-1 min-h-30 bg-accent/5 rounded-md border p-3 overflow-y-auto prose prose-sm dark:prose-invert max-w-none">
                                                     {newLessonContent ? (
                                                         <ReactMarkdown>
                                                             {newLessonContent}

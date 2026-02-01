@@ -19,7 +19,7 @@ export default function RoleChangeConfirmModal({ open, onOpenChange, pendingRole
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-[100] overflow-hidden p-0 backdrop-blur-sm"
+        className="sm:max-w-md fixed top-[55%]! border border-border shadow-2xl z-100 overflow-hidden p-0 backdrop-blur-sm"
         style={{ backgroundColor: 'oklch(var(--background))' }}
       >
         <DialogHeader className="p-6 pb-0">

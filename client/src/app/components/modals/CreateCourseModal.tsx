@@ -5,9 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Trash2, Plus, FileText, ChevronRight, ChevronLeft, BookOpen, Upload, X, Sparkles, Download, Loader2 } from 'lucide-react';
-import { AddLessonPayload, generateCourseContent } from '../../api/courseApi';
-import { Textarea } from '../ui/textarea';
+import { Trash2, FileText, ChevronRight, ChevronLeft, BookOpen, Upload, X, Sparkles, Download, Loader2 } from 'lucide-react';
+import { AddLessonPayload } from '../../api/courseApi';
+import ReactMarkdown from 'react-markdown';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
@@ -39,13 +39,11 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
   const [newLessonContent, setNewLessonContent] = React.useState('');
   const [newLessonDuration, setNewLessonDuration] = React.useState(15);
 
-  // Bulk Import State
+  // Import / AI Generator State
   const [showImport, setShowImport] = React.useState(false);
+  const [showGenerator, setShowGenerator] = React.useState(false);
   const [importError, setImportError] = React.useState<string | null>(null);
   const jsonFileInputRef = React.useRef<HTMLInputElement | null>(null);
-
-  // AI Generator State
-  const [showGenerator, setShowGenerator] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [genTopic, setGenTopic] = React.useState('');
   const [genLevel, setGenLevel] = React.useState('beginner');
@@ -104,90 +102,69 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
     if (editingIndex === index) cancelEdit();
   };
 
-  const handleJsonFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleJsonFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setImportError(null);
     const reader = new FileReader();
 
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
+        const contentStr = event.target?.result as string;
+        const parsed = JSON.parse(contentStr);
 
-        if (!Array.isArray(parsed)) {
-          throw new Error('File must contain a JSON array (start with [ and end with ])');
-        }
+        if (!Array.isArray(parsed)) throw new Error('File must contain a JSON array of lessons');
 
-        const newLessons: AddLessonPayload[] = [];
-        let skippedCount = 0;
+        const baseOrder = lessons.length > 0 ? Math.max(...lessons.map(l => l.order)) : 0;
+        const imported: AddLessonPayload[] = [];
 
-        parsed.forEach((item: any) => {
-          if (!item.title || !item.content) {
-            skippedCount++;
-            return;
-          }
-
-          newLessons.push({
+        for (let i = 0; i < parsed.length; i++) {
+          const item: any = parsed[i];
+          if (!item.title || !item.content) continue;
+          imported.push({
             title: item.title,
             content: item.content,
             duration: Number(item.duration) || 15,
-            order: lessons.length + newLessons.length + 1
+            order: baseOrder + i + 1
           });
-        });
-
-        if (newLessons.length === 0) {
-          throw new Error('No valid lessons found in file. Ensure "title" and "content" fields exist.');
         }
 
-        setLessons([...lessons, ...newLessons]);
+        setLessons([...lessons, ...imported]);
         setShowImport(false);
-        // Reset file input
         if (jsonFileInputRef.current) jsonFileInputRef.current.value = '';
-
       } catch (err: any) {
-        setImportError(err.message || 'Failed to parse JSON file');
+        console.error('Import failed', err);
+        setImportError(err.message || 'Failed to import JSON');
       }
     };
 
-    reader.onerror = () => {
-      setImportError('Error reading file');
-    };
-
-    reader.readAsText(file);
+    reader.onerror = () => setImportError('Error reading file');
     reader.readAsText(file);
   };
 
   const handleGenerateContent = async () => {
     if (!genTopic) return;
-
     setIsGenerating(true);
     setImportError(null);
-
     try {
-      const result = await generateCourseContent({
-        topic: genTopic,
-        level: genLevel,
-        count: genCount
-      });
-
-      // Populate lessons state directly as per "Big Picture" plan
-      const newLessons: AddLessonPayload[] = result.lessons.map((l: any, i: number) => ({
-        ...l,
-        order: lessons.length + i + 1
+      const { generateCourseContent } = await import('../../api/courseApi');
+      const result = await generateCourseContent({ topic: genTopic, level: genLevel, count: genCount });
+      
+      const baseOrder = lessons.length > 0 ? Math.max(...lessons.map(l => l.order)) : 0;
+      const generated: AddLessonPayload[] = result.lessons.map((l: any, i: number) => ({
+        title: l.title,
+        content: l.content,
+        duration: Number(l.duration) || 15,
+        order: baseOrder + i + 1
       }));
 
-      setLessons([...lessons, ...newLessons]);
-
-      // Close generator and reset topic
+      setLessons([...lessons, ...generated]);
       setShowGenerator(false);
       setGenTopic('');
-
     } catch (err: any) {
-      console.error("Generation failed", err);
-      // Using importError to show generation error for now, or could use toast
-      setImportError(err.message || "Failed to generate content");
+      console.error('Generation failed', err);
+      setImportError(err.message || 'Failed to generate content');
     } finally {
       setIsGenerating(false);
     }
@@ -206,13 +183,17 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
       setNewLessonTitle('');
       setNewLessonContent('');
       setEditingIndex(null);
+      setShowImport(false);
+      setShowGenerator(false);
+      setImportError(null);
+      setGenTopic('');
     }
   }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-4xl w-full max-h-[90vh] fixed top-[55%]! left-[50%] -translate-x-1/2 -translate-y-1/2 flex flex-col rounded-2xl border border-border shadow-2xl p-0 overflow-hidden z-[60]"
+        className="sm:max-w-4xl w-full max-h-[90vh] fixed top-[55%]! left-[50%] -translate-x-1/2 -translate-y-1/2 flex flex-col rounded-2xl border border-border shadow-2xl p-0 overflow-hidden z-60"
         style={{ backgroundColor: 'oklch(var(--background))' }}
       >
         <DialogHeader className="flex-none p-8 pb-2">
@@ -240,7 +221,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                 <div className="space-y-1.5 text-foreground!">
                   <label className="text-sm font-medium text-foreground">Description <span className="text-red-500">*</span></label>
                   <textarea
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-accent/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:bg-accent/10 text-foreground"
+                    className="flex min-h-25 w-full rounded-md border border-input bg-accent/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus:bg-accent/10 text-foreground"
                     placeholder="What will students learn in this course?"
                     value={courseForm.description}
                     onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
@@ -261,7 +242,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent
-                        className="border-border z-[100]! opacity-100! shadow-2xl"
+                        className="border-border z-100! opacity-100! shadow-2xl"
                         style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                       >
                         <SelectItem value="Programming">Programming</SelectItem>
@@ -285,7 +266,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent
-                        className="border-border z-[100]! opacity-100! shadow-2xl"
+                        className="border-border z-100! opacity-100! shadow-2xl"
                         style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                       >
                         <SelectItem value="beginner">Beginner</SelectItem>
@@ -382,7 +363,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                 <div className="p-3 bg-muted font-medium text-sm flex justify-between items-center">
                   <span>Curriculum ({lessons.length} Lessons)</span>
                 </div>
-                <ScrollArea className="flex-1 p-2 h-[450px]">
+                <ScrollArea className="flex-1 p-2 h-112.5">
                   {lessons.length === 0 ? (
                     <div className="text-center p-8 text-muted-foreground text-sm flex flex-col items-center">
                       <BookOpen className="h-8 w-8 mb-2 opacity-50" />
@@ -414,7 +395,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                           <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <FileText className="h-3 w-3" />
-                              <span className="truncate max-w-[150px]">{lesson.content.substring(0, 30)}...</span>
+                              <span className="truncate max-w-37.5">{lesson.content.substring(0, 30)}...</span>
                             </div>
                             <Badge variant="outline" className="text-[10px] h-auto py-0">{lesson.duration}m</Badge>
                           </div>
@@ -425,12 +406,12 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                 </ScrollArea>
               </div>
 
-              {/* Right: Add Lesson Form or Import */}
+              {/* Right: Import / AI Generate Options */}
               <div className="md:w-2/3 flex flex-col space-y-4">
                 <div className="font-semibold flex items-center justify-between text-foreground">
                   <div className="flex items-center gap-2">
-                    {showImport ? <Upload className="h-4 w-4" /> : editingIndex !== null ? <FileText className="h-4 w-4 text-primary" /> : <Plus className="h-4 w-4" />}
-                    {showImport ? 'Import Lessons (JSON)' : editingIndex !== null ? 'Edit Lesson' : 'Add Lesson'}
+                    {showImport ? <Upload className="h-4 w-4" /> : showGenerator ? <Sparkles className="h-4 w-4 text-purple-500" /> : <BookOpen className="h-4 w-4" />}
+                    {showImport ? 'Import Lessons (JSON)' : showGenerator ? 'AI Content Generator' : 'Add Lessons'}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -439,13 +420,13 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                       className="h-8 text-xs font-normal"
                       onClick={() => {
                         setShowImport(!showImport);
+                        setShowGenerator(false);
                         setImportError(null);
-                        setEditingIndex(null);
                       }}
                     >
                       {showImport ? (
                         <>
-                          <X className="h-3 w-3 mr-1" /> Cancel Import
+                          <X className="h-3 w-3 mr-1" /> Cancel
                         </>
                       ) : (
                         <>
@@ -458,18 +439,29 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                       size="sm"
                       className="h-8 text-xs font-normal text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
                       onClick={() => {
-                        setShowGenerator(true);
+                        if (!showGenerator) {
+                          setGenTopic(courseForm.title || '');
+                          setGenLevel(courseForm.difficulty || 'beginner');
+                        }
+                        setShowGenerator(!showGenerator);
                         setShowImport(false);
                       }}
                     >
-                      <Sparkles className="h-3 w-3 mr-1" /> AI Generate
+                      {showGenerator ? (
+                        <>
+                          <X className="h-3 w-3 mr-1" /> Cancel
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3 mr-1" /> AI Generate
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
 
                 {showImport ? (
                   <div className="space-y-4 flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-muted-foreground/20 rounded-xl bg-accent/5">
-
                     <div className="text-center space-y-2 max-w-sm">
                       <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                         <Upload className="h-6 w-6 text-primary" />
@@ -507,16 +499,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                     </div>
                   </div>
                 ) : showGenerator ? (
-                  <div className="space-y-3 flex-1 flex flex-col p-4 border rounded-md bg-accent/5 overflow-y-auto max-h-[400px]">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-purple-500" /> AI Content Generator
-                      </h3>
-                      <Button variant="ghost" size="sm" className="h-6" onClick={() => setShowGenerator(false)}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-
+                  <div className="space-y-3 flex-1 flex flex-col p-4 border rounded-md bg-accent/5 overflow-y-auto max-h-100">
                     <div className="space-y-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Topic</Label>
@@ -536,7 +519,7 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent
-                              className="border-border z-[100]! opacity-100! shadow-2xl"
+                              className="border-border z-100! opacity-100! shadow-2xl"
                               style={{ backgroundColor: 'oklch(var(--background))', color: 'oklch(var(--foreground))' }}
                             >
                               <SelectItem value="beginner">Beginner</SelectItem>
@@ -566,8 +549,8 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                     )}
 
                     <div className="bg-purple-50 dark:bg-purple-900/10 p-2 rounded text-[10px] text-purple-800 dark:text-purple-300 border border-purple-100 dark:border-purple-900/20">
-                      <p>Generates a <strong>{genCount}</strong>-lesson course on <strong>{genTopic || '...'}</strong> ({genLevel}).</p>
-                      <p className="mt-1 opacity-70">Clicking Generate will download a JSON file.</p>
+                      <p>Generates <strong>{genCount}</strong> lessons on <strong>{genTopic || '...'}</strong> ({genLevel}).</p>
+                      <p className="mt-1 opacity-70">These lessons will be added to your curriculum.</p>
                     </div>
 
                     <Button
@@ -581,58 +564,42 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                         </>
                       ) : (
                         <>
-                          <Download className="h-3 w-3 mr-2" /> Generate JSON File
+                          <Download className="h-3 w-3 mr-2" /> Generate Lessons
                         </>
                       )}
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3 flex-1 overflow-y-auto pr-1">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="lesson-title">Lesson Title <span className="text-red-500">*</span></Label>
-                      <Input
-                        id="lesson-title"
-                        placeholder="e.g. Introduction to Variables"
-                        value={newLessonTitle}
-                        onChange={(e) => setNewLessonTitle(e.target.value)}
-                        className="bg-accent/5"
-                      />
-                    </div>
+                  editingIndex !== null ? (
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="font-semibold flex items-center gap-2 text-foreground">
+                          <FileText className="h-4 w-4 text-primary" /> Preview Lesson
+                        </div>
+                        <div>
+                          <Button variant="ghost" size="sm" onClick={() => setEditingIndex(null)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <Label htmlFor="lesson-duration">Duration (mins)</Label>
-                      <Input
-                        id="lesson-duration"
-                        type="number"
-                        min="1"
-                        value={newLessonDuration}
-                        onChange={(e) => setNewLessonDuration(parseInt(e.target.value) || 0)}
-                        className="bg-accent/5"
-                      />
+                      <ScrollArea className="flex-1 p-4">
+                        <div className="prose prose-sm dark:prose-invert max-w-none bg-background/50 p-4 rounded-xl border border-border/50">
+                          <ReactMarkdown>{lessons[editingIndex].content}</ReactMarkdown>
+                        </div>
+                      </ScrollArea>
                     </div>
-
-                    <div className="space-y-1.5 flex-1 flex flex-col">
-                      <Label htmlFor="lesson-content">Content (Markdown) <span className="text-red-500">*</span></Label>
-                      <Textarea
-                        id="lesson-content"
-                        placeholder="Enter your lesson content here..."
-                        className="flex-1 min-h-[120px] bg-accent/5 font-mono text-sm"
-                        value={newLessonContent}
-                        onChange={(e) => setNewLessonContent(e.target.value)}
-                      />
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center p-6 border rounded-md bg-accent/5">
+                      <div className="text-center max-w-md space-y-3">
+                        <BookOpen className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+                        <h3 className="font-semibold text-lg">Add Lessons</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Use <strong>Import JSON</strong> to upload lessons from a file, or <strong>AI Generate</strong> to create lessons automatically.
+                        </p>
+                      </div>
                     </div>
-
-                    <div className="flex gap-2">
-                      {editingIndex !== null && (
-                        <Button variant="outline" onClick={cancelEdit} className="flex-1 h-9">
-                          Cancel
-                        </Button>
-                      )}
-                      <Button onClick={addOrUpdateLesson} disabled={!newLessonTitle || !newLessonContent} className={`flex-1 h-9 ${editingIndex !== null ? 'gradient-bg-primary' : ''}`}>
-                        {editingIndex !== null ? 'Update Lesson' : 'Add Lesson'}
-                      </Button>
-                    </div>
-                  </div>
+                  )
                 )}
               </div>
             </div>
@@ -648,14 +615,6 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-
             {step === 1 ? (
               <Button onClick={handleNext} disabled={!courseForm.title || !courseForm.description || !courseForm.category}>
                 Next: Add Lessons <ChevronRight className="h-4 w-4 ml-1" />
@@ -669,6 +628,14 @@ export default function CreateCourseModal({ open, onOpenChange, courseForm, setC
                 {isSaving ? 'Creating...' : `Create Course (${lessons.length} Lessons)`}
               </Button>
             )}
+
+            <Button
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

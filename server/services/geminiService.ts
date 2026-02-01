@@ -25,61 +25,107 @@ export class GeminiService {
             model: "gemini-2.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
+                maxOutputTokens: 8192,
             }
         });
         return this.model;
     }
 
     static async generateLessonPlan(topic: string, level: string, count: number): Promise<{ lessons: GeneratedLesson[] }> {
-        try {
-            const model = this.getModel();
-
-            const prompt = `
-        You are a world-class technical instructor and course creator known for clear, engaging, and practical teaching.
-        Create a detailed, structured lesson plan for a course on "${topic}".
-        Target Audience Level: ${level}
-        Number of Lessons: ${count}
-        
-        Return a JSON object with this structure:
-        {
-          "lessons": [
-            {
-              "title": "Engaging Lesson Title",
-              "content": "Full markdown content string",
-              "duration": 15
+        const model = this.getModel();
+        // Helper to parse single-lesson JSON responses robustly
+        const tryParse = (s: string) => {
+            try {
+                return JSON.parse(s);
+            } catch {
+                return null;
             }
-          ]
-        }
-        
-        CRITICAL CONTENT RULES:
-        1. **Format**: The "content" field MUST be valid Markdown.
-        2. **Structure**: Each lesson's content MUST follow this structure:
-           - **Introduction**: Briefly explain what will be learned and why it matters.
-           - **Core Concepts**: Explain the theory clearly using analogies where helpful.
-           - **Practical Examples (MANDATORY)**: If the topic allows (especially for programming), you MUST provide code examples.
-             - Use standard Markdown code blocks: \`\`\`language ... \`\`\`
-             - Add comments to explain the code.
-           - **Real-World Application**: How is this used in industry?
-           - **Summary**: A quick recap of key takeaways.
-        3. **Tone**: Professional, encouraging, and authoritative but accessible.
-        4. **Length**: Each lesson should be substantial (approx. 400-600 words) to provide real value. Avoid superficial summaries.
-        5. **Code**: For programming topics, code examples are NOT optional. They must be included and explained.
-      `;
+        };
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+        const extractObject = (src: string) => {
+            const first = src.indexOf('{');
+            const last = src.lastIndexOf('}');
+            if (first === -1 || last === -1 || last <= first) return null;
+            return src.slice(first, last + 1);
+        };
 
-            const data = JSON.parse(text);
+        const repairString = (src: string) => {
+            let repaired = '';
+            let inStr = false;
+            for (let i = 0; i < src.length; i++) {
+                const ch = src[i];
+                if (ch === '"') {
+                    let backslashes = 0;
+                    let j = i - 1;
+                    while (j >= 0 && src[j] === '\\') { backslashes++; j--; }
+                    const escaped = backslashes % 2 === 1;
+                    if (!escaped) inStr = !inStr;
+                    repaired += ch;
+                    continue;
+                }
 
-            if (!data.lessons || !Array.isArray(data.lessons)) {
-                throw new Error("Invalid response format from AI: 'lessons' array missing");
+                if (inStr) {
+                    if (ch === '\\') {
+                        const next = src[i + 1];
+                        const validEscapes = ['"', '\\', '/', 'b', 'f', 'n', 'r', 't'];
+                        if (next && validEscapes.includes(next)) {
+                            repaired += ch + next; i++; continue;
+                        }
+                        if (next === 'u') {
+                            const hex = src.substr(i + 2, 4);
+                            if (/^[0-9a-fA-F]{4}$/.test(hex)) { repaired += '\\u' + hex; i += 5; continue; }
+                            repaired += '\\\\'; continue;
+                        }
+                        repaired += '\\\\'; continue;
+                    }
+                    if (ch === '\n' || ch === '\r') { repaired += '\\n'; continue; }
+                }
+                repaired += ch;
             }
+            return repaired;
+        };
 
-            return data;
-        } catch (error: any) {
-            console.error("Gemini AI Generation Error:", error);
-            throw new Error(`Failed to generate content: ${error.message}`);
+        const lessons: GeneratedLesson[] = [];
+        for (let idx = 1; idx <= count; idx++) {
+            try {
+                // Per-lesson prompt to reduce overall output size and improve parsing
+                const perPrompt = `You are a concise technical instructor. Produce ONE lesson (only a single JSON object) for the course "${topic}" targeting ${level} learners. This is lesson ${idx} of ${count}. ${level.toLowerCase() === 'beginner' ? 'Use simple language and explain basics.' : level.toLowerCase() === 'advanced' ? 'Use advanced concepts and concise explanations.' : 'Use clear technical language.'} RETURN ONLY a single JSON OBJECT with keys: title (string), content (markdown string), duration (minutes as integer). Ensure content uses escaped newlines (\\n) and escaped quotes (\\\"). Do not include any surrounding text.`;
+
+                const res = await model.generateContent(perPrompt);
+                const response = await res.response;
+                let text = (await response.text()).trim();
+                if (text.startsWith('```')) text = text.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '');
+
+                // Try direct parse
+                let obj = tryParse(text);
+                if (!obj) {
+                    // Try extract object
+                    const cand = extractObject(text);
+                    if (cand) obj = tryParse(cand);
+                }
+                if (!obj) {
+                    // Repair and try again
+                    const cand = extractObject(text) || text;
+                    const repaired = repairString(cand);
+                    obj = tryParse(repaired);
+                }
+
+                if (!obj || !obj.title || !obj.content) {
+                    console.error('Failed to parse lesson', idx, 'raw:', text.substring(0, 2000));
+                    throw new Error(`Failed to parse lesson ${idx} from AI response`);
+                }
+
+                lessons.push({
+                    title: String(obj.title).trim(),
+                    content: String(obj.content),
+                    duration: Number(obj.duration) || 15,
+                });
+            } catch (err) {
+                console.error('Gemini parsing error for lesson', idx, err);
+                throw new Error(`Failed to generate lesson ${idx}: ${err instanceof Error ? err.message : String(err)}`);
+            }
         }
+
+        return { lessons };
     }
 }
