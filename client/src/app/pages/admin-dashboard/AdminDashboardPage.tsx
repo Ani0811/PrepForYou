@@ -45,8 +45,7 @@ import {
   Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { storage, auth } from '../../lib/firebase';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, UploadTask } from 'firebase/storage';
+import { auth } from '../../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   CreateUserModal,
@@ -200,7 +199,6 @@ export default function AdminDashboardPage() {
 
   // File upload states
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadTask, setUploadTask] = useState<UploadTask | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
@@ -511,7 +509,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleFileSelected = (file: File) => {
+  const handleFileSelected = async (file: File) => {
     if (!file) return;
 
     // show local preview
@@ -520,47 +518,52 @@ export default function AdminDashboardPage() {
       setLocalPreview(url);
     } catch { }
 
-    const filename = `${Date.now()}_${file.name}`;
-    const storageReference = storageRef(storage, `courses/${filename}`);
-    const task = uploadBytesResumable(storageReference, file);
-
-    setUploadTask(task as UploadTask);
     setIsUploading(true);
     setUploadProgress(0);
 
-    task.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        setUploadProgress(progress);
-      },
-      (error) => {
-        console.error('Upload error:', error);
-        toast.error('Image upload failed');
-        setIsUploading(false);
-        setUploadProgress(null);
-        setUploadTask(null);
-      },
-      async () => {
-        try {
-          const url = await getDownloadURL(task.snapshot.ref);
-          if (isEditCourseModalOpen) {
-            setEditCourseForm((prev) => ({ ...prev, imageUrl: url }));
-          } else {
-            setCourseForm((prev) => ({ ...prev, imageUrl: url }));
-          }
-          setLocalPreview(url);
-          toast.success('Image uploaded');
-        } catch (err) {
-          console.error('Failed to get download URL:', err);
-          toast.error('Failed to retrieve image URL');
-        } finally {
-          setIsUploading(false);
-          setUploadProgress(null);
-          setUploadTask(null);
-        }
+    // Upload to local server
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'courses');
+
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev === null || prev >= 90) return prev;
+          return prev + 10;
+        });
+      }, 100);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
       }
-    );
+
+      const data = await response.json();
+      const url = data.url;
+
+      if (isEditCourseModalOpen) {
+        setEditCourseForm((prev) => ({ ...prev, imageUrl: url }));
+      } else {
+        setCourseForm((prev) => ({ ...prev, imageUrl: url }));
+      }
+      setLocalPreview(url);
+      toast.success('Image uploaded');
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Image upload failed');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
   };
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -570,15 +573,8 @@ export default function AdminDashboardPage() {
   };
 
   const cancelUpload = () => {
-    if (!uploadTask) return;
-    try {
-      uploadTask.cancel();
-    } catch (e) {
-      try { uploadTask.cancel(); } catch { }
-    }
     setIsUploading(false);
     setUploadProgress(null);
-    setUploadTask(null);
     // revoke local preview if present
     if (localPreview && localPreview.startsWith('blob:')) {
       URL.revokeObjectURL(localPreview);
@@ -593,17 +589,11 @@ export default function AdminDashboardPage() {
   };
 
   const pauseUpload = () => {
-    if (!uploadTask) return;
-    try {
-      uploadTask.pause();
-    } catch (e) { }
+    // No-op for local uploads
   };
 
   const resumeUpload = () => {
-    if (!uploadTask) return;
-    try {
-      uploadTask.resume();
-    } catch (e) { }
+    // No-op for local uploads
   };
 
   const openEditModal = (user: User) => {
@@ -987,9 +977,9 @@ export default function AdminDashboardPage() {
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{course.description}</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty}</Badge>
-                    <Badge variant="outline">
+                    <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs font-medium px-2.5 py-0.5 rounded-md">{course.category}</Badge>
+                    <Badge className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-medium px-2.5 py-0.5 rounded-md capitalize">{course.difficulty}</Badge>
+                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-medium px-2.5 py-0.5 rounded-md">
                       {course.duration >= 60
                         ? `${Math.floor(course.duration / 60)}h${course.duration % 60 > 0 ? ` ${course.duration % 60}m` : ''}`
                         : `${course.duration}m`}

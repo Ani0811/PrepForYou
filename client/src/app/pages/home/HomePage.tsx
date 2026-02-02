@@ -167,7 +167,7 @@ export default function HomePage() {
                           {course.description}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="gradient-bg-secondary">
+                      <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs font-medium px-2.5 py-0.5 rounded-md shrink-0">
                         {course.category}
                       </Badge>
                     </div>

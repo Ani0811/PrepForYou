@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { auth } from '../../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -20,10 +20,99 @@ import {
     CheckCircle,
     ChevronLeft,
     Menu,
-    Loader2
+    Loader2,
+    Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+
+// Code Block with Typing Animation Component (triggers on scroll)
+function CodeBlockWithTyping({ match, children, ...props }: any) {
+    const [displayedCode, setDisplayedCode] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
+    const fullCode = String(children).replace(/\n$/, '');
+    const hasTyped = useRef(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Intersection Observer to detect when code block is in viewport
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !hasTyped.current) {
+                    setIsVisible(true);
+                }
+            },
+            { threshold: 0.3 } // Trigger when 30% of the code block is visible
+        );
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        return () => {
+            if (containerRef.current) {
+                observer.unobserve(containerRef.current);
+            }
+        };
+    }, []);
+
+    // Typing animation effect
+    useEffect(() => {
+        if (!isVisible || hasTyped.current) {
+            if (hasTyped.current) {
+                setDisplayedCode(fullCode);
+                setIsTyping(false);
+            }
+            return;
+        }
+
+        hasTyped.current = true;
+        let index = 0;
+        setDisplayedCode('');
+        setIsTyping(true);
+
+        const typingInterval = setInterval(() => {
+            if (index < fullCode.length) {
+                setDisplayedCode(fullCode.slice(0, index + 1));
+                index++;
+            } else {
+                setIsTyping(false);
+                clearInterval(typingInterval);
+            }
+        }, 20); // Typing speed: 20ms per character
+
+        return () => clearInterval(typingInterval);
+    }, [isVisible, fullCode]);
+
+    return (
+        <div ref={containerRef} className="rounded-xl overflow-hidden my-6 shadow-2xl border border-border/50 bg-slate-50 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950">
+            {/* macOS-style window header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800 dark:to-slate-900 border-b border-border">
+                <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm hover:bg-red-600 transition-colors cursor-pointer" />
+                        <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm hover:bg-yellow-600 transition-colors cursor-pointer" />
+                        <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm hover:bg-green-600 transition-colors cursor-pointer" />
+                    </div>
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-400 ml-2">
+                        {match?.[1] || 'code'}
+                    </span>
+                </div>
+                <div className="text-xs text-slate-600 dark:text-slate-500 font-mono">
+                    {match?.[1] ? `script.${match[1]}` : 'untitled'}
+                </div>
+            </div>
+            {/* Code content with typing animation */}
+            <pre className="m-0 p-0 bg-transparent relative">
+                <code className="block p-6 text-sm font-mono overflow-x-auto text-slate-900 dark:text-slate-100 leading-relaxed bg-transparent" {...props}>
+                    {displayedCode}
+                    {isTyping && <span className="inline-block w-2 h-5 bg-primary/70 ml-0.5 animate-pulse" />}
+                </code>
+            </pre>
+        </div>
+    );
+}
 
 export default function StudyPage() {
     const params = useParams();
@@ -40,6 +129,9 @@ export default function StudyPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCompleting, setIsCompleting] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const mainScrollRef = useRef<HTMLDivElement | null>(null);
+    const contentSentinelRef = useRef<HTMLDivElement | null>(null);
+    const [hasSeenContent, setHasSeenContent] = useState(false);
 
     // Auth & Data Fetching
     useEffect(() => {
@@ -54,6 +146,39 @@ export default function StudyPage() {
         });
         return () => unsubscribe();
     }, [courseId]);
+
+    // Reset seen-content flag when lesson changes or when completed lessons update
+    useEffect(() => {
+        setHasSeenContent(activeLesson ? completedLessonIds.has(activeLesson.id) : false);
+    }, [activeLesson, completedLessonIds]);
+
+    // Observe sentinel within the main scroll container to detect when user reaches end
+    useEffect(() => {
+        const sentinel = contentSentinelRef.current;
+        const root = mainScrollRef.current;
+        if (!sentinel || !root) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) setHasSeenContent(true);
+            },
+            { root, threshold: 0.9 }
+        );
+
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [activeLesson]);
+
+    // Scroll main content to top whenever the active lesson changes
+    useEffect(() => {
+        if (mainScrollRef.current) {
+            try {
+                mainScrollRef.current.scrollTo({ top: 0, behavior: 'auto' });
+            } catch (e) {
+                mainScrollRef.current.scrollTop = 0;
+            }
+        }
+    }, [activeLesson]);
 
     const fetchData = async (uid: string) => {
         try {
@@ -146,6 +271,8 @@ export default function StudyPage() {
         );
     }
 
+    const isCompleteLocked = !hasSeenContent && !completedLessonIds.has(activeLesson.id);
+
     return (
         <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
             {/* Sidebar - Lesson Navigation */}
@@ -154,7 +281,7 @@ export default function StudyPage() {
                     } bg-background/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out relative z-20 shrink-0 border-border overflow-hidden`}
             >
                 <div className="p-5 border-b border-border bg-card/50 min-w-[320px]">
-                    <Button variant="ghost" size="sm" className="mb-3 -ml-2 text-muted-foreground hover:text-foreground transition-colors" onClick={() => router.push('/courses')}>
+                    <Button variant="outline" size="sm" className="mb-3 w-full font-semibold transition transform hover:-translate-y-0.5 hover:shadow-sm" onClick={() => router.push('/courses')}>
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Back to Courses
                     </Button>
@@ -166,29 +293,42 @@ export default function StudyPage() {
                     </div>
                 </div>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 overflow-y-auto">
                     <div className="p-4 space-y-2.5 min-w-[320px]">
                         {lessons.map((lesson, index) => {
                             const isCompleted = completedLessonIds.has(lesson.id);
                             const isActive = activeLesson.id === lesson.id;
+                            
+                            // Check if previous lesson is completed (for locking logic)
+                            const isPreviousCompleted = index === 0 || completedLessonIds.has(lessons[index - 1].id);
+                            const isLocked = !isPreviousCompleted && !isCompleted;
 
                             return (
                                 <div
                                     key={lesson.id}
-                                    onClick={() => handleLessonSelect(lesson)}
+                                    onClick={() => !isLocked && handleLessonSelect(lesson)}
                                     className={`
-                    group flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all border-2
-                    ${isActive
+                    group flex items-start gap-3 p-3.5 rounded-xl transition-all border-2
+                    ${isLocked 
+                        ? 'cursor-not-allowed opacity-50 bg-muted/30 border-border/30' 
+                        : 'cursor-pointer'}
+                    ${isActive && !isLocked
                                             ? 'bg-primary/10 border-primary/30 shadow-md shadow-primary/10'
-                                            : 'hover:bg-accent/50 border-transparent hover:border-border/50'
+                                            : !isLocked ? 'hover:bg-accent/50 border-transparent hover:border-border/50' : 'border-transparent'
                                         }
                   `}
                                 >
-                                    <div className={`mt-0.5 transition-transform ${isActive ? 'scale-110' : ''} ${isCompleted ? 'text-green-500' : isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                                        {isCompleted ? <CheckCircle className="h-5 w-5 fill-green-500/20" /> : <BookOpen className="h-5 w-5" />}
+                                    <div className={`mt-0.5 transition-transform ${isActive && !isLocked ? 'scale-110' : ''} ${isLocked ? 'text-muted-foreground/50' : isCompleted ? 'text-green-500' : isActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                                        {isLocked ? (
+                                            <Lock className="h-5 w-5" />
+                                        ) : isCompleted ? (
+                                            <CheckCircle className="h-5 w-5 fill-green-500/20" />
+                                        ) : (
+                                            <BookOpen className="h-5 w-5" />
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-sm font-semibold leading-tight mb-1.5 ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                                        <p className={`text-sm font-semibold leading-tight mb-1.5 ${isLocked ? 'text-muted-foreground' : isActive ? 'text-primary' : 'text-foreground'}`}>
                                             {index + 1}. {lesson.title}
                                         </p>
                                         <div className="flex items-center gap-2">
@@ -198,6 +338,11 @@ export default function StudyPage() {
                                             {isCompleted && (
                                                 <span className="text-[9px] text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-wide font-bold">
                                                     ✓ Done
+                                                </span>
+                                            )}
+                                            {isLocked && (
+                                                <span className="text-[9px] text-orange-600 bg-orange-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-wide font-bold">
+                                                    🔒 Locked
                                                 </span>
                                             )}
                                         </div>
@@ -245,7 +390,7 @@ export default function StudyPage() {
                 )}
 
 
-                <div className="flex-1 overflow-y-auto h-full scrollbar-gutter-stable">
+                <div ref={mainScrollRef} className="flex-1 overflow-y-auto h-full scrollbar-gutter-stable">
                     <div className="max-w-4xl mx-auto p-6 md:p-12 space-y-10 pb-32">
 
                         {/* Header */}
@@ -281,35 +426,12 @@ export default function StudyPage() {
                                         li: ({ node, ...props }) => <li className="pl-1" {...props} />,
                                         code: ({ node, className, children, ...props }: any) => {
                                             const match = /language-(\w+)/.exec(className || '')
-                                            return !Number(match) ? (
+                                            return !match ? (
                                                 <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-primary" {...props}>
                                                     {children}
                                                 </code>
                                             ) : (
-                                                <div className="rounded-xl overflow-hidden my-6 shadow-2xl border border-border/50 bg-linear-to-br from-slate-900 to-slate-950 dark:from-slate-950 dark:to-black">
-                                                    {/* macOS-style window header */}
-                                                    <div className="flex items-center justify-between px-4 py-3 bg-linear-to-r from-slate-800 to-slate-900 dark:from-slate-900 dark:to-black border-b border-slate-700/50">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex gap-1.5">
-                                                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
-                                                                <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm" />
-                                                                <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm" />
-                                                            </div>
-                                                            <span className="text-xs font-medium text-slate-400 ml-2">
-                                                                {match?.[1] || 'code'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 font-mono">
-                                                            {match?.[1] ? `script.${match[1]}` : 'untitled'}
-                                                        </div>
-                                                    </div>
-                                                    {/* Code content */}
-                                                    <pre className="m-0! p-0! bg-transparent!">
-                                                        <code className="block p-6 text-sm font-mono overflow-x-auto bg-transparent! text-slate-100 dark:text-slate-200 leading-relaxed" {...props}>
-                                                            {children}
-                                                        </code>
-                                                    </pre>
-                                                </div>
+                                                <CodeBlockWithTyping match={match} {...props}>{children}</CodeBlockWithTyping>
                                             )
                                         },
                                         blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-primary/50 pl-4 italic my-6 text-muted-foreground bg-primary/5 py-2 pr-2 rounded-r" {...props} />,
@@ -321,10 +443,12 @@ export default function StudyPage() {
                         </div>
 
                     </div>
+                    <div ref={contentSentinelRef} className="w-full h-2" />
                 </div>
 
                 {/* Bottom Action Bar */}
-                <div className="border-t border-border p-5 bg-background/95 backdrop-blur-xl absolute bottom-0 left-0 right-0 z-10 flex justify-between items-center max-w-none shadow-2xl">
+                 <div className="border-t border-border p-5 absolute bottom-0 left-0 right-0 z-10 flex justify-between items-center max-w-none shadow-2xl"
+                     style={{ backgroundColor: 'oklch(var(--background) / 1)' }}>
                     <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
                         <div className={`w-2 h-2 rounded-full ${completedLessonIds.has(activeLesson.id) ? 'bg-green-500' : 'bg-primary'} animate-pulse`} />
                         {completedLessonIds.has(activeLesson.id) ? "You've completed this lesson!" : "Mark as complete to unlock the next lesson"}
@@ -332,7 +456,7 @@ export default function StudyPage() {
                     <div className="flex gap-3 ml-auto w-full md:w-auto">
                         <Button
                             variant="outline"
-                            className="flex-1 md:flex-none font-semibold"
+                            className="flex-1 md:flex-none font-semibold transition transform disabled:opacity-60 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-md"
                             onClick={() => {
                                 const currIdx = lessons.findIndex(l => l.id === activeLesson.id);
                                 if (currIdx > 0) setActiveLesson(lessons[currIdx - 1]);
@@ -345,11 +469,12 @@ export default function StudyPage() {
 
                         <Button
                             onClick={handleCompleteLesson}
-                            disabled={isCompleting}
-                            className={`flex-1 md:flex-none font-bold text-base px-6 ${completedLessonIds.has(activeLesson.id)
+                            disabled={isCompleting || isCompleteLocked}
+                            title={isCompleteLocked ? 'Scroll to the end of the lesson to unlock' : undefined}
+                            className={`flex-1 md:flex-none font-bold text-base px-6 transition-transform ${completedLessonIds.has(activeLesson.id)
                                 ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
                                 : "gradient-bg-primary shadow-lg shadow-primary/30"
-                                }`}
+                                } ${isCompleteLocked ? 'opacity-60 cursor-not-allowed hover:shadow-none hover:scale-100' : 'hover:scale-[1.02] hover:shadow-xl'}`}
                         >
                             {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {completedLessonIds.has(activeLesson.id) ? 'Next Lesson' : 'Complete & Continue'}

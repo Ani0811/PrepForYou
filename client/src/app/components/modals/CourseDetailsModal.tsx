@@ -1,8 +1,10 @@
 "use client";
 
+import React from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { Progress } from '../ui/progress';
 import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2 } from 'lucide-react';
 import { CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
@@ -31,39 +33,51 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
     const isEnrolled = course.status !== 'not-started';
     const isCompleted = course.status === 'completed';
 
+    // If user is already enrolled/applied, auto-close modal (no need to show details dialog)
+    // This keeps the calling code simple: opening the modal when already enrolled will immediately close it.
+    React.useEffect(() => {
+        if (isEnrolled && open) {
+            try {
+                onOpenChange(false);
+            } catch (e) {
+                // ignore
+            }
+        }
+    }, [isEnrolled, open, onOpenChange]);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 showCloseButton={false}
-                className="sm:max-w-2xl! top-[55%]! p-0 overflow-hidden border-0 gap-0 z-60"
+                className="sm:max-w-xl top-[55%] p-0 overflow-hidden border-0 gap-0 z-50"
                 style={{ backgroundColor: 'oklch(var(--background))' }}
             >
-                {/* Banner Image */}
-                <div className="relative h-48 w-full bg-muted">
+                {/* Banner Header */}
+                <div className="relative h-32 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center px-5 gap-5 overflow-hidden">
                     {course.imageUrl ? (
-                        <img
-                            src={course.imageUrl}
-                            alt={course.title}
-                            className="w-full h-full object-cover"
-                        />
+                        <div className="relative z-10 shrink-0">
+                            <img
+                                src={course.imageUrl}
+                                alt={course.title}
+                                className="h-20 w-20 object-contain drop-shadow-[0_8px_30px_rgb(0,0,0,0.5)] transform -rotate-3 hover:rotate-0 transition-transform duration-300"
+                            />
+                        </div>
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-primary/20 to-secondary/20">
-                            <BookOpen className="h-12 w-12 text-primary/40" />
+                        <div className="h-20 w-20 flex items-center justify-center bg-background/10 rounded-xl shrink-0">
+                            <BookOpen className="h-10 w-10 text-primary/40" />
                         </div>
                     )}
 
-                    <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent" />
-
-                    <div className="absolute bottom-4 left-6 right-6">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                            <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30 font-bold uppercase text-[10px] tracking-wider">
+                    <div className="relative z-10 flex-1 min-w-0">
+                        <div className="flex flex-wrap gap-1.5 mb-1.5">
+                            <Badge className="bg-blue-500/90 hover:bg-blue-500 text-white border-0 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-md">
                                 {course.category}
                             </Badge>
-                            <Badge variant="outline" className="bg-secondary/20 text-secondary-foreground border-secondary/30 font-bold uppercase text-[10px] tracking-wider">
+                            <Badge className="bg-purple-500/90 hover:bg-purple-500 text-white border-0 px-2.5 py-0.5 text-[10px] font-bold rounded-full shadow-md capitalize">
                                 {course.difficulty}
                             </Badge>
                         </div>
-                        <DialogTitle className="text-2xl md:text-3xl font-display font-bold text-foreground drop-shadow-sm">
+                        <DialogTitle className="text-xl md:text-2xl font-display font-bold text-white drop-shadow-md truncate">
                             {course.title}
                         </DialogTitle>
                         <DialogDescription className="sr-only">
@@ -71,10 +85,12 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                         </DialogDescription>
                     </div>
 
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-4 right-4 rounded-full bg-background/20 backdrop-blur-md hover:bg-background/40 text-foreground"
+                        className="absolute top-2 right-2 rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 text-white z-20"
                         onClick={onOpenChange.bind(null, false)}
                     >
                         <span className="sr-only">Close</span>
@@ -98,18 +114,18 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
 
                 <div className="grid md:grid-cols-3 gap-0">
                     {/* Main Content */}
-                    <div className="md:col-span-2 p-6 space-y-5">
+                    <div className="md:col-span-2 p-4 space-y-4">
                         <div>
-                            <h3 className="text-lg font-display font-bold mb-2 flex items-center gap-2">
+                            <h3 className="text-base font-display font-bold mb-1.5 flex items-center gap-2">
                                 <BookOpen className="h-4 w-4 text-primary" />
                                 About this Course
                             </h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
                                 {course.description}
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
                             <div className="flex items-center gap-2.5 p-2 rounded-lg bg-accent/5">
                                 <div className="p-1.5 rounded-full bg-blue-500/10 text-blue-500">
                                     <Clock className="h-4 w-4" />
@@ -157,58 +173,73 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                     </div>
 
                     {/* Sidebar / Actions */}
-                    <div className="md:col-span-1 p-6 bg-accent/5 border-l border-border flex flex-col gap-6">
-                        <div className="space-y-4">
-                            <h3 className="font-display font-bold text-lg">Course Actions</h3>
+                    <div className="md:col-span-1 p-4 bg-accent/5 border-l border-border flex flex-col gap-4">
+                        <div className="space-y-3">
+                            <h3 className="font-display font-bold text-base">Course Actions</h3>
 
                             {!isEnrolled ? (
                                 <Button
-                                    size="lg"
-                                    className="w-full gradient-bg-primary shadow-lg shadow-primary/20 text-lg font-bold h-12"
+                                    size="sm"
+                                    className="w-full gradient-bg-primary shadow-lg shadow-primary/20 text-base font-bold h-10"
                                     onClick={onEnroll}
                                     disabled={isEnrolling}
                                 >
                                     {isEnrolling ? 'Enrolling...' : 'Apply Now'}
-                                    {!isEnrolling && <BookOpen className="ml-2 h-5 w-5" />}
+                                    {!isEnrolling && <BookOpen className="ml-2 h-4 w-4" />}
                                 </Button>
                             ) : (
-                                <Button
-                                    size="lg"
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-base font-bold h-12 flex items-center justify-center"
-                                    onClick={onEnroll}
-                                    disabled={isEnrolling}
-                                >
-                                    <span className="truncate">{isCompleted ? 'Review Course' : 'Continue'}</span>
-                                    {!isEnrolling && <BookOpen className="ml-2 h-4 w-4 shrink-0" />}
-                                </Button>
+                                <>
+                                    <div className="space-y-2 p-3 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="font-medium text-muted-foreground">Your Progress</span>
+                                            <span className="font-bold text-primary">{Math.round(course.progress)}%</span>
+                                        </div>
+                                        <Progress value={course.progress} className="h-2" />
+                                        {isCompleted && (
+                                            <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
+                                                <Award className="h-3 w-3" />
+                                                <span>Completed!</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-sm font-bold h-10 flex items-center justify-center"
+                                        onClick={onEnroll}
+                                        disabled={isEnrolling}
+                                    >
+                                        <span className="truncate">{isCompleted ? 'Review' : 'Continue'}</span>
+                                        {!isEnrolling && <BookOpen className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
+                                    </Button>
+                                </>
                             )}
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <Button variant="outline" className="w-full" onClick={handleSaveForLater}>
-                                    <Heart className="mr-2 h-4 w-4" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" className="w-full h-9 text-xs font-semibold" onClick={handleSaveForLater}>
+                                    <Heart className="mr-1.5 h-3.5 w-3.5" />
                                     Save
                                 </Button>
-                                <Button variant="outline" className="w-full" onClick={handleShare}>
-                                    <Share2 className="mr-2 h-4 w-4" />
+                                <Button variant="outline" size="sm" className="w-full h-9 text-xs font-semibold" onClick={handleShare}>
+                                    <Share2 className="mr-1.5 h-3.5 w-3.5" />
                                     Share
                                 </Button>
                             </div>
                         </div>
 
-                        <div className="border-t border-border pt-6 mt-auto">
-                            <h4 className="font-medium mb-3 text-sm">Skills you'll learn</h4>
-                            <div className="flex flex-wrap gap-2">
+                        <div className="border-t border-border pt-4 mt-auto">
+                            <h4 className="font-medium mb-2 text-xs">Skills you'll learn</h4>
+                            <div className="flex flex-wrap gap-1.5">
                                 {course.tags.length > 0 ? (
                                     course.tags.map(tag => (
-                                        <Badge key={tag} variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold">
+                                        <Badge key={tag} className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md hover:from-blue-500/20 hover:to-purple-500/20 transition-colors">
                                             {tag}
                                         </Badge>
                                     ))
                                 ) : (
                                     <>
-                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase">{course.category}</Badge>
-                                        <Badge variant="secondary" className="bg-accent text-accent-foreground text-[10px] font-bold">FUNDAMENTALS</Badge>
-                                        <Badge variant="secondary" className="bg-accent text-accent-foreground text-[10px] font-bold">PRACTICAL SKILLS</Badge>
+                                        <Badge className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md">{course.category}</Badge>
+                                        <Badge className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-foreground border border-emerald-500/20 text-xs font-medium px-3 py-1 rounded-md">Fundamentals</Badge>
+                                        <Badge className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 text-foreground border border-orange-500/20 text-xs font-medium px-3 py-1 rounded-md">Practical Skills</Badge>
                                     </>
                                 )}
                             </div>

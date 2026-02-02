@@ -156,40 +156,31 @@ export async function deleteUser(firebaseUid: string): Promise<void> {
 }
 
 /**
- * Upload avatar to Firebase Storage and return the public URL
+ * Upload avatar to local storage and return the public URL
  */
 export async function uploadAvatar(file: File, firebaseUid: string): Promise<{
   avatarUrl: string;
   avatarStoragePath: string;
 }> {
   try {
-    const { storage } = await import('../lib/firebase');
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'avatars');
 
-    // Create a unique file name with timestamp to avoid collisions
-    const timestamp = Date.now();
-    const fileExtension = file.name.split('.').pop() || 'jpg';
-    const fileName = `${firebaseUid}_${timestamp}.${fileExtension}`;
-    const storagePath = `avatars/${fileName}`;
-
-    // Create a reference to the file location
-    const storageRef = ref(storage, storagePath);
-
-    // Upload the file
-    const snapshot = await uploadBytes(storageRef, file, {
-      contentType: file.type,
-      customMetadata: {
-        uploadedBy: firebaseUid,
-        uploadedAt: new Date().toISOString(),
-      },
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
     });
 
-    // Get the public download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+
+    const data = await response.json();
 
     return {
-      avatarUrl: downloadURL,
-      avatarStoragePath: storagePath,
+      avatarUrl: data.url,
+      avatarStoragePath: data.url,
     };
   } catch (error: any) {
     console.error('Error uploading avatar:', error);

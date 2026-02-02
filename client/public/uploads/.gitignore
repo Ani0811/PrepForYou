@@ -1,0 +1,3 @@
+# Keep uploaded files locally but don't commit them
+*
+!.gitignore

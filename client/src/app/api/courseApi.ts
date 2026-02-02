@@ -117,7 +117,8 @@ export async function getAllCourses(params?: {
   }
 
   const data = await response.json();
-  return { courses: data.courses, pagination: data.pagination };
+  const courses = data.courses as Course[];
+  return { courses, pagination: data.pagination };
 }
 
 /**
@@ -175,7 +176,7 @@ export async function getCoursesWithProgress(
   }
 
   const data = await response.json();
-  return data.courses;
+  return data.courses as CourseWithProgress[];
 }
 
 /**
@@ -200,7 +201,7 @@ export async function getRecommendedCourses(firebaseUid: string): Promise<Course
   }
 
   const data = await response.json();
-  return data.courses;
+  return data.courses as CourseWithProgress[];
 }
 
 /**
