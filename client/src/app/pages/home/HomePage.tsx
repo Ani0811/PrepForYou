@@ -196,7 +196,7 @@ export default function HomePage() {
             {[
               { title: 'Study Guide', desc: 'Review key concepts' },
               { title: 'Practice Tests', desc: 'Test your knowledge' },
-              { title: 'Video Tutorials', desc: 'Watch and learn' },
+              { title: 'Blogs', desc: 'Read and Learn' },
               { title: 'Discussion Forum', desc: 'Ask questions' },
             ].map((resource) => (
               <button

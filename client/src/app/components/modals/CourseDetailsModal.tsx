@@ -1,13 +1,15 @@
 "use client";
 
-import React from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2 } from 'lucide-react';
+import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2, Download } from 'lucide-react';
 import { CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
+import { generateCourseCertificate } from '../../lib/certificateGenerator';
+import { auth } from '../../lib/firebase';
 
 interface Props {
     open: boolean;
@@ -18,6 +20,8 @@ interface Props {
 }
 
 export default function CourseDetailsModal({ open, onOpenChange, course, onEnroll, isEnrolling }: Props) {
+    const [isDownloadingCertificate, setIsDownloadingCertificate] = useState(false);
+    
     if (!course) return null;
 
     const handleSaveForLater = () => {
@@ -29,21 +33,33 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
         toast.success("Link copied to clipboard!");
     };
 
+    const handleDownloadCertificate = async () => {
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+            toast.error("Please sign in to download certificate");
+            return;
+        }
+
+        setIsDownloadingCertificate(true);
+        try {
+            await generateCourseCertificate(
+                course,
+                currentUser.displayName || 'Student',
+                currentUser.email || ''
+            );
+            toast.success("Certificate downloaded successfully! 🎉");
+        } catch (error) {
+            console.error('Error generating certificate:', error);
+            toast.error("Failed to generate certificate");
+        } finally {
+            setIsDownloadingCertificate(false);
+        }
+    };
+
     // Determine button state based on progress/status
     const isEnrolled = course.status !== 'not-started';
     const isCompleted = course.status === 'completed';
-
-    // If user is already enrolled/applied, auto-close modal (no need to show details dialog)
-    // This keeps the calling code simple: opening the modal when already enrolled will immediately close it.
-    React.useEffect(() => {
-        if (isEnrolled && open) {
-            try {
-                onOpenChange(false);
-            } catch (e) {
-                // ignore
-            }
-        }
-    }, [isEnrolled, open, onOpenChange]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -53,7 +69,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                 style={{ backgroundColor: 'oklch(var(--background))' }}
             >
                 {/* Banner Header */}
-                <div className="relative h-32 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center px-5 gap-5 overflow-hidden">
+                <div className="relative h-32 w-full bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center px-5 gap-5 overflow-hidden">
                     {course.imageUrl ? (
                         <div className="relative z-10 shrink-0">
                             <img
@@ -85,7 +101,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                         </DialogDescription>
                     </div>
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent pointer-events-none" />
 
                     <Button
                         variant="ghost"
@@ -189,7 +205,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                                 </Button>
                             ) : (
                                 <>
-                                    <div className="space-y-2 p-3 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+                                    <div className="space-y-2 p-3 rounded-lg bg-linear-to-br from-primary/5 to-primary/10 border border-primary/20">
                                         <div className="flex items-center justify-between text-xs mb-1">
                                             <span className="font-medium text-muted-foreground">Your Progress</span>
                                             <span className="font-bold text-primary">{Math.round(course.progress)}%</span>
@@ -202,15 +218,45 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                                             </div>
                                         )}
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-sm font-bold h-10 flex items-center justify-center"
-                                        onClick={onEnroll}
-                                        disabled={isEnrolling}
-                                    >
-                                        <span className="truncate">{isCompleted ? 'Review' : 'Continue'}</span>
-                                        {!isEnrolling && <BookOpen className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
-                                    </Button>
+                                    
+                                    {isCompleted ? (
+                                        <div className="space-y-2">
+                                            <Button
+                                                size="sm"
+                                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-sm font-bold h-10 flex items-center justify-center"
+                                                onClick={onEnroll}
+                                                disabled={isEnrolling}
+                                            >
+                                                <span className="truncate">Review Course</span>
+                                                {!isEnrolling && <BookOpen className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="w-full bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 text-sm font-bold h-10 flex items-center justify-center"
+                                                onClick={handleDownloadCertificate}
+                                                disabled={isDownloadingCertificate}
+                                            >
+                                                {isDownloadingCertificate ? (
+                                                    <span className="truncate">Generating...</span>
+                                                ) : (
+                                                    <>
+                                                        <Download className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                                                        <span className="truncate">Download Certificate</span>
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 text-sm font-bold h-10 flex items-center justify-center"
+                                            onClick={onEnroll}
+                                            disabled={isEnrolling}
+                                        >
+                                            <span className="truncate">Continue Learning</span>
+                                            {!isEnrolling && <BookOpen className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
+                                        </Button>
+                                    )}
                                 </>
                             )}
 
@@ -231,15 +277,15 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                             <div className="flex flex-wrap gap-1.5">
                                 {course.tags.length > 0 ? (
                                     course.tags.map(tag => (
-                                        <Badge key={tag} className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md hover:from-blue-500/20 hover:to-purple-500/20 transition-colors">
+                                        <Badge key={tag} className="bg-linear-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md hover:from-blue-500/20 hover:to-purple-500/20 transition-colors">
                                             {tag}
                                         </Badge>
                                     ))
                                 ) : (
                                     <>
-                                        <Badge className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md">{course.category}</Badge>
-                                        <Badge className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-foreground border border-emerald-500/20 text-xs font-medium px-3 py-1 rounded-md">Fundamentals</Badge>
-                                        <Badge className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 text-foreground border border-orange-500/20 text-xs font-medium px-3 py-1 rounded-md">Practical Skills</Badge>
+                                        <Badge className="bg-linear-to-r from-blue-500/10 to-purple-500/10 text-foreground border border-blue-500/20 text-xs font-medium px-3 py-1 rounded-md">{course.category}</Badge>
+                                        <Badge className="bg-linear-to-r from-emerald-500/10 to-teal-500/10 text-foreground border border-emerald-500/20 text-xs font-medium px-3 py-1 rounded-md">Fundamentals</Badge>
+                                        <Badge className="bg-linear-to-r from-orange-500/10 to-amber-500/10 text-foreground border border-orange-500/20 text-xs font-medium px-3 py-1 rounded-md">Practical Skills</Badge>
                                     </>
                                 )}
                             </div>

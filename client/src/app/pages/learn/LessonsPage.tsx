@@ -86,9 +86,9 @@ function CodeBlockWithTyping({ match, children, ...props }: any) {
     }, [isVisible, fullCode]);
 
     return (
-        <div ref={containerRef} className="rounded-xl overflow-hidden my-6 shadow-2xl border border-border/50 bg-slate-50 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-950">
+        <div ref={containerRef} className="rounded-xl overflow-hidden my-6 shadow-2xl border border-border/50 bg-slate-50 dark:bg-linear-to-br dark:from-slate-900 dark:to-slate-950">
             {/* macOS-style window header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-gradient-to-r dark:from-slate-800 dark:to-slate-900 border-b border-border">
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-linear-to-r dark:from-slate-800 dark:to-slate-900 border-b border-border">
                 <div className="flex items-center gap-2">
                     <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm hover:bg-red-600 transition-colors cursor-pointer" />
