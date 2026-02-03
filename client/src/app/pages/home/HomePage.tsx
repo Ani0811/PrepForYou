@@ -2,6 +2,7 @@
 
 // Hook imports removed for App Router conversion; use client-side auth for name display.
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -23,6 +24,8 @@ export default function HomePage() {
   const tasks: any[] = [];
   const courses: any[] = [];
   const stats: any = undefined;
+
+  const router = useRouter();
 
   const pendingTasks = tasks.filter(t => !t.completed).slice(0, 5);
   const inProgressCourses = courses.filter(c => Number(c.progress) > 0 && Number(c.progress) < 100).slice(0, 3);
@@ -194,13 +197,15 @@ export default function HomePage() {
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: 'Study Guide', desc: 'Review key concepts' },
-              { title: 'Practice Tests', desc: 'Test your knowledge' },
-              { title: 'Blogs', desc: 'Read and Learn' },
-              { title: 'Discussion Forum', desc: 'Ask questions' },
+              { title: 'Study Guide', desc: 'Review key concepts', path: '/study-guide' },
+              { title: 'Practice Tests', desc: 'Test your knowledge', path: '/practice-tests' },
+              { title: 'Blogs', desc: 'Read and Learn', path: '/blogs' },
+              { title: 'Discussion Forum', desc: 'Ask questions', path: '/discussion-forum' },
             ].map((resource) => (
               <button
                 key={resource.title}
+                type="button"
+                onClick={() => router.push(resource.path)}
                 className="p-4 rounded-lg border gradient-card hover:shadow-gradient-md hover:scale-105 transition-all duration-500 text-left group"
               >
                 <div className="w-10 h-10 rounded-lg gradient-bg-primary mb-3 group-hover:scale-110 transition-transform shadow-gradient-sm" />
