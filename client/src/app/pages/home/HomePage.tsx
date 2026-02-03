@@ -201,6 +201,7 @@ export default function HomePage() {
                 {inProgressCourses.map((course) => (
                   <div
                     key={Number(course.id)}
+                    onClick={() => router.push(`/learn?courseId=${course.id}`)}
                     className="p-4 rounded-lg border gradient-card hover:shadow-gradient-md transition-all duration-500 cursor-pointer hover:scale-105"
                   >
                     <div className="flex items-start justify-between mb-2">

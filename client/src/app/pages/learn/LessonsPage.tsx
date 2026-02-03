@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { auth } from '../../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -420,10 +420,61 @@ export default function StudyPage() {
                                         h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mt-8 mb-4 font-display" {...props} />,
                                         h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mt-6 mb-3 font-display" {...props} />,
                                         h3: ({ node, ...props }) => <h3 className="text-xl font-bold mt-5 mb-2 font-display" {...props} />,
-                                        p: ({ node, ...props }) => <p className="mb-4 leading-relaxed" {...props} />,
+                                        p: ({ node, children, ...props }) => {
+                                            const regex = /(\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)+\b)/g;
+                                            const mapChild = (child: any, idxBase = 0) => {
+                                                if (typeof child !== 'string') return child;
+                                                const parts: any[] = [];
+                                                let lastIndex = 0;
+                                                let match: RegExpExecArray | null;
+                                                let i = 0;
+                                                while ((match = regex.exec(child)) !== null) {
+                                                    const m = match[0];
+                                                    const idx = match.index;
+                                                    if (idx > lastIndex) parts.push(child.slice(lastIndex, idx));
+                                                    parts.push(
+                                                        <code key={`inline-code-${idxBase}-${i}`} className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-primary">
+                                                            {m}
+                                                        </code>
+                                                    );
+                                                    lastIndex = idx + m.length;
+                                                    i++;
+                                                }
+                                                if (lastIndex < child.length) parts.push(child.slice(lastIndex));
+                                                return parts.length > 1 ? parts : parts[0] || null;
+                                            };
+
+                                            const processed = React.Children.map(children, (c, i) => mapChild(c, i) );
+                                            return <p className="mb-4 leading-relaxed" {...props}>{processed}</p>;
+                                        },
                                         ul: ({ node, ...props }) => <ul className="list-disc pl-6 mb-4 space-y-2" {...props} />,
                                         ol: ({ node, ...props }) => <ol className="list-decimal pl-6 mb-4 space-y-2" {...props} />,
-                                        li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                                        li: ({ node, children, ...props }) => {
+                                            const regex = /(\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)+\b)/g;
+                                            const mapChild = (child: any, idxBase = 0) => {
+                                                if (typeof child !== 'string') return child;
+                                                const parts: any[] = [];
+                                                let lastIndex = 0;
+                                                let match: RegExpExecArray | null;
+                                                let i = 0;
+                                                while ((match = regex.exec(child)) !== null) {
+                                                    const m = match[0];
+                                                    const idx = match.index;
+                                                    if (idx > lastIndex) parts.push(child.slice(lastIndex, idx));
+                                                    parts.push(
+                                                        <code key={`inline-code-li-${idxBase}-${i}`} className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-primary">
+                                                            {m}
+                                                        </code>
+                                                    );
+                                                    lastIndex = idx + m.length;
+                                                    i++;
+                                                }
+                                                if (lastIndex < child.length) parts.push(child.slice(lastIndex));
+                                                return parts.length > 1 ? parts : parts[0] || null;
+                                            };
+                                            const processed = React.Children.map(children, (c, i) => mapChild(c, i));
+                                            return <li className="pl-1" {...props}>{processed}</li>;
+                                        },
                                         code: ({ node, className, children, ...props }: any) => {
                                             const match = /language-(\w+)/.exec(className || '')
                                             return !match ? (
@@ -437,7 +488,7 @@ export default function StudyPage() {
                                         blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-primary/50 pl-4 italic my-6 text-muted-foreground bg-primary/5 py-2 pr-2 rounded-r" {...props} />,
                                     }}
                                 >
-                                    {activeLesson.content}
+                                    {activeLesson.content.replace(/\\n/g, '\n')}
                                 </ReactMarkdown>
                             </div>
                         </div>
