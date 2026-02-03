@@ -1,24 +1,74 @@
-// Hook imports removed for App Router conversion; use server-side data instead.
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import { Trophy, TrendingUp, Clock, BookOpen, Award, Target, Flame, Lightbulb, Brain, Zap, TrendingDown } from 'lucide-react';
+import { getUserStats } from '../../api/userApi';
+import { getCoursesWithProgress, CourseWithProgress } from '../../api/courseApi';
+import { toast } from 'sonner';
 
 export default function ProgressPage() {
-  // Server-provided data placeholders (replace with real server fetching)
-  const stats: any = undefined;
-  const achievements: any[] = [];
-  const courses: any[] = [];
-  const analytics: any = undefined;
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [courses, setCourses] = useState<CourseWithProgress[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const completedCourses = courses.filter(c => Number(c.progress) === 100);
-  const inProgressCourses = courses.filter(c => Number(c.progress) > 0 && Number(c.progress) < 100);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        toast.error('You must be logged in to view progress.');
+        router.push('/login');
+        return;
+      }
+      setCurrentUser(user);
+      await fetchData(user.uid);
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  const fetchData = async (firebaseUid: string) => {
+    try {
+      setIsLoading(true);
+      const [statsData, coursesData] = await Promise.all([
+        getUserStats(firebaseUid),
+        getCoursesWithProgress(firebaseUid),
+      ]);
+      
+      setStats(statsData.stats);
+      setAnalytics(statsData.analytics);
+      setCourses(coursesData);
+    } catch (error) {
+      console.error('Error fetching progress data:', error);
+      toast.error('Failed to load progress data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const achievements: any[] = [];
+  const completedCourses = courses.filter(c => c.status === 'completed');
+  const inProgressCourses = courses.filter(c => c.status === 'in-progress');
 
   const overallProgress = courses.length > 0
-    ? Math.round(courses.reduce((sum, c) => sum + Number(c.progress), 0) / courses.length)
+    ? Math.round(courses.reduce((sum, c) => sum + c.progress, 0) / courses.length)
     : 0;
 
-  const learningStreak = stats ? Number(stats.learningStreak) : 0;
+  const learningStreak = stats?.learningStreak || 0;
   const streakTrend = learningStreak > 7 ? 'excellent' : learningStreak > 3 ? 'good' : 'needs-improvement';
 
   return (
@@ -73,7 +123,7 @@ export default function ProgressPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold gradient-text">
-              {stats ? Math.floor(Number(stats.totalTimeSpent) / 60) : 0}h {stats ? Number(stats.totalTimeSpent) % 60 : 0}m
+              {stats?.totalTimeSpent ? Math.floor(stats.totalTimeSpent / 60) : 0}h {stats?.totalTimeSpent ? stats.totalTimeSpent % 60 : 0}m
             </div>
             <p className="text-xs text-muted-foreground mt-1 font-sans">Time invested in learning</p>
           </CardContent>
@@ -118,7 +168,7 @@ export default function ProgressPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground font-sans">Recommended Daily</p>
                   <p className="text-2xl font-display font-bold gradient-text">
-                    {analytics ? Number(analytics.recommendedStudyTime) : 60} min
+                    {analytics?.recommendedStudyTime || 60} min
                   </p>
                 </div>
               </div>
@@ -177,7 +227,7 @@ export default function ProgressPage() {
           </div>
 
           {/* Top Categories */}
-          {analytics && analytics.topCategories.length > 0 && (
+          {analytics?.topCategories && analytics.topCategories.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-semibold text-sm flex items-center gap-2 font-display">
                 <Lightbulb className="h-4 w-4 text-chart-1" />
@@ -198,7 +248,7 @@ export default function ProgressPage() {
           )}
 
           {/* Improvement Areas */}
-          {analytics && analytics.improvementAreas.length > 0 && (
+          {analytics?.improvementAreas && analytics.improvementAreas.length > 0 && (
             <div className="space-y-3">
               <h4 className="font-semibold text-sm flex items-center gap-2 font-display">
                 <Target className="h-4 w-4 text-primary" />
@@ -251,14 +301,14 @@ export default function ProgressPage() {
                 </p>
               ) : (
                 inProgressCourses.map((course) => (
-                  <div key={Number(course.id)} className="space-y-2 p-3 rounded-lg border gradient-card backdrop-blur-sm hover:shadow-gradient-sm transition-all duration-300 hover:scale-105">
+                  <div key={course.id} className="space-y-2 p-3 rounded-lg border gradient-card backdrop-blur-sm hover:shadow-gradient-sm transition-all duration-300 hover:scale-105">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm font-display">{course.title}</span>
                       <Badge variant="secondary" className="gradient-bg-secondary">
-                        {Number(course.progress)}%
+                        {course.progress}%
                       </Badge>
                     </div>
-                    <Progress value={Number(course.progress)} className="h-1.5" />
+                    <Progress value={course.progress} className="h-1.5" />
                   </div>
                 ))
               )}

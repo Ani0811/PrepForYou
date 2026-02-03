@@ -253,7 +253,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
                                             onClick={onEnroll}
                                             disabled={isEnrolling}
                                         >
-                                            <span className="truncate">Continue Learning</span>
+                                            <span className="truncate">Continue</span>
                                             {!isEnrolling && <BookOpen className="ml-1.5 h-3.5 w-3.5 shrink-0" />}
                                         </Button>
                                     )}

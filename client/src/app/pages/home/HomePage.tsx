@@ -1,34 +1,74 @@
 "use client";
 
-// Hook imports removed for App Router conversion; use client-side auth for name display.
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import { getUserStats } from '../../api/userApi';
+import { getCoursesWithProgress } from '../../api/courseApi';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
-import { CheckCircle2, Circle, BookOpen, Clock, Target, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Circle, BookOpen, Clock, Target, TrendingUp, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function HomePage() {
-  // Client-side user profile (populated from Firebase auth)
   const [userProfile, setUserProfile] = useState<any>(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) setUserProfile({ name: u.displayName, email: u.email });
-      else setUserProfile(null);
-    });
-    return () => unsub();
-  }, []);
-  const tasks: any[] = [];
-  const courses: any[] = [];
-  const stats: any = undefined;
-
+  const [stats, setStats] = useState<any>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserProfile({ name: user.displayName, email: user.email });
+        try {
+          setLoading(true);
+          setError(null);
+          
+          // Fetch user stats and courses in parallel
+          const [statsResponse, coursesResponse] = await Promise.all([
+            getUserStats(user.uid),
+            getCoursesWithProgress(user.uid)
+          ]);
+          
+          setStats(statsResponse.stats);
+          setCourses(coursesResponse || []);
+        } catch (err: any) {
+          console.error('Error fetching user data:', err);
+          setError(err.message || 'Failed to load user data');
+          toast.error('Failed to load your data. Please try refreshing the page.');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setUserProfile(null);
+        setStats(null);
+        setCourses([]);
+        setLoading(false);
+        router.push('/login');
+      }
+    });
+    return () => unsub();
+  }, [router]);
+
+  // Mock tasks for now (could be fetched from backend later)
+  const tasks: any[] = [];
   const pendingTasks = tasks.filter(t => !t.completed).slice(0, 5);
   const inProgressCourses = courses.filter(c => Number(c.progress) > 0 && Number(c.progress) < 100).slice(0, 3);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-100">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading your dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -53,10 +93,10 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold gradient-text">
-              {stats ? Number(stats.totalCourses) : courses.length}
+              {stats?.totalCourses ?? courses.length}
             </div>
             <p className="text-xs text-muted-foreground font-sans">
-              {stats ? Number(stats.completedCourses) : 0} completed
+              {stats?.completedCourses ?? 0} completed
             </p>
           </CardContent>
         </Card>
@@ -70,7 +110,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold gradient-text">
-              {stats ? Number(stats.learningStreak) : 0} days
+              {stats?.learningStreak ?? 0} days
             </div>
             <p className="text-xs text-muted-foreground font-sans">Keep it up!</p>
           </CardContent>

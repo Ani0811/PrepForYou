@@ -6,6 +6,7 @@ import {
   deleteUser,
   getAllUsers,
   updateUserRole,
+  getUserStats,
 } from '../controllers/user.controller';
 
 const router = Router();
@@ -16,6 +17,12 @@ const router = Router();
  * Body: { firebaseUid, email, displayName?, avatarUrl?, avatarProvider? }
  */
 router.post('/signin', upsertUserOnSignIn);
+ 
+/**
+ * GET /api/users/:firebaseUid/stats
+ * Get user stats and learning analytics
+ */
+router.get('/:firebaseUid/stats', getUserStats);
 
 /**
  * GET /api/users/:firebaseUid
@@ -49,5 +56,4 @@ router.get('/', getAllUsers);
  * Body: { role: 'user' | 'admin' | 'owner' }
  */
 router.patch('/:userId/role', updateUserRole);
-
 export default router;

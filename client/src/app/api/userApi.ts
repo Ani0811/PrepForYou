@@ -364,3 +364,42 @@ export async function reportUser(userId: string, payload: {
   const data = await response.json();
   return { reportId: data.reportId };
 }
+
+/**
+ * Get user stats and learning analytics
+ */
+export async function getUserStats(firebaseUid: string): Promise<{
+  stats: {
+    totalCourses: number;
+    completedCourses: number;
+    inProgressCourses: number;
+    totalTimeSpent: number;
+    learningStreak: number;
+    completionRate: number;
+  };
+  analytics: {
+    recommendedStudyTime: number;
+    topCategories: string[];
+    improvementAreas: string[];
+  };
+}> {
+  const response = await fetch(`${API_URL}/users/${firebaseUid}/stats`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to fetch user stats';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url: `${API_URL}/users/${firebaseUid}/stats`, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  return { stats: data.stats, analytics: data.analytics };
+}

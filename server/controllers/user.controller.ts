@@ -262,3 +262,93 @@ export const updateUserRole = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to update user role', details: error.message });
   }
 };
+
+/**
+ * Get user stats and learning analytics
+ * GET /api/users/:firebaseUid/stats
+ */
+export const getUserStats = async (req: Request, res: Response) => {
+  try {
+    const firebaseUidParam = req.params.firebaseUid;
+    const firebaseUid = Array.isArray(firebaseUidParam) ? firebaseUidParam[0] : firebaseUidParam;
+
+    if (!firebaseUid) {
+      return res.status(400).json({ error: 'firebaseUid is required' });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { firebaseUid },
+      include: {
+        courseProgress: {
+          include: {
+            course: true,
+            lessonProgress: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Calculate stats
+    const totalCourses = user.courseProgress.length;
+    const completedCourses = user.courseProgress.filter((p: any) => p.status === 'completed').length;
+    const inProgressCourses = user.courseProgress.filter((p: any) => p.status === 'in-progress').length;
+    
+    // Calculate total time spent (sum of course durations for courses with progress)
+    const totalTimeSpent = user.courseProgress.reduce((sum: number, cp: any) => {
+      return sum + (cp.course.duration * (cp.progress / 100));
+    }, 0);
+
+    // Calculate learning streak (simplified - days with activity)
+    const recentActivity = user.courseProgress
+      .filter((cp: any) => cp.lastAccessedAt)
+      .map((cp: any) => new Date(cp.lastAccessedAt).toDateString());
+    const uniqueDays = new Set(recentActivity);
+    const learningStreak = uniqueDays.size;
+
+    // Get top categories
+    const categoryCount: Record<string, number> = {};
+    user.courseProgress.forEach((cp: any) => {
+      const category = cp.course.category;
+      categoryCount[category] = (categoryCount[category] || 0) + 1;
+    });
+    const topCategories = Object.entries(categoryCount)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([category]) => category);
+
+    // Get courses needing attention (low progress)
+    const improvementAreas = user.courseProgress
+      .filter((cp: any) => cp.status === 'in-progress' && cp.progress < 30)
+      .slice(0, 3)
+      .map((cp: any) => cp.course.title);
+
+    const stats = {
+      totalCourses,
+      completedCourses,
+      inProgressCourses,
+      totalTimeSpent: Math.round(totalTimeSpent),
+      learningStreak,
+      completionRate: totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0,
+    };
+
+    const analytics = {
+      recommendedStudyTime: 60, // Default recommendation
+      topCategories,
+      improvementAreas,
+    };
+
+    return res.status(200).json({
+      success: true,
+      stats,
+      analytics,
+    });
+  } catch (error: any) {
+    console.error('Error fetching user stats:', error);
+    return res.status(500).json({ error: 'Failed to fetch user stats', details: error.message });
+  }
+};
