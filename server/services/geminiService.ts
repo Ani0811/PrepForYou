@@ -33,108 +33,109 @@ export class GeminiService {
 
     static async generateLessonPlan(topic: string, level: string, count: number): Promise<{ lessons: GeneratedLesson[] }> {
         const model = this.getModel();
-        // Helper to parse single-lesson JSON responses robustly
-        const tryParse = (s: string) => {
-            try {
-                return JSON.parse(s);
-            } catch {
-                return null;
-            }
-        };
 
-        const extractObject = (src: string) => {
-            const first = src.indexOf('{');
-            const last = src.lastIndexOf('}');
-            if (first === -1 || last === -1 || last <= first) return null;
-            return src.slice(first, last + 1);
-        };
+        // Determine level-specific guidance
+        const levelGuidance = 
+            level.toLowerCase() === 'beginner' 
+                ? 'Use simple language, explain basics thoroughly, and avoid jargon. Include plenty of examples.'
+                : level.toLowerCase() === 'advanced'
+                ? 'Use advanced concepts, technical terminology, and concise explanations. Focus on depth and best practices.'
+                : 'Use clear technical language appropriate for intermediate learners. Balance theory with practical examples.';
 
-        const repairString = (src: string) => {
-            let repaired = '';
-            let inStr = false;
-            for (let i = 0; i < src.length; i++) {
-                const ch = src[i];
-                if (ch === '"') {
-                    let backslashes = 0;
-                    let j = i - 1;
-                    while (j >= 0 && src[j] === '\\') { backslashes++; j--; }
-                    const escaped = backslashes % 2 === 1;
-                    if (!escaped) inStr = !inStr;
-                    repaired += ch;
-                    continue;
-                }
+        // Single prompt requesting ALL lessons at once
+        const prompt = `You are an expert technical instructor creating a complete course on "${topic}" for ${level} learners.
 
-                if (inStr) {
-                    if (ch === '\\') {
-                        const next = src[i + 1];
-                        const validEscapes = ['"', '\\', '/', 'b', 'f', 'n', 'r', 't'];
-                        if (next && validEscapes.includes(next)) {
-                            repaired += ch + next; i++; continue;
-                        }
-                        if (next === 'u') {
-                            const hex = src.substr(i + 2, 4);
-                            if (/^[0-9a-fA-F]{4}$/.test(hex)) { repaired += '\\u' + hex; i += 5; continue; }
-                            repaired += '\\\\'; continue;
-                        }
-                        repaired += '\\\\'; continue;
-                    }
-                    if (ch === '\n' || ch === '\r') { repaired += '\\n'; continue; }
-                }
-                repaired += ch;
-            }
-            return repaired;
-        };
+Generate exactly ${count} lessons that progressively build knowledge from foundational concepts to advanced topics.
 
-        const lessons: GeneratedLesson[] = [];
-        for (let idx = 1; idx <= count; idx++) {
-            try {
-                // Per-lesson prompt to reduce overall output size and improve parsing
-                const perPrompt = `You are a concise technical instructor. Produce ONE lesson (only a single JSON object) for the course "${topic}" targeting ${level} learners. This is lesson ${idx} of ${count}. ${level.toLowerCase() === 'beginner' ? 'Use simple language and explain basics.' : level.toLowerCase() === 'advanced' ? 'Use advanced concepts and concise explanations.' : 'Use clear technical language.'} 
+${levelGuidance}
 
 CRITICAL FORMATTING RULES:
 - For code examples, ALWAYS use proper markdown code blocks with triple backticks and language identifier (e.g., \`\`\`python for Python code)
 - Use inline backticks for short code references like function names or variables (e.g., \`variable_name\`, \`function()\`)
 - Ensure all code blocks have proper opening \`\`\`language and closing \`\`\` fences
-- Use escaped newlines (\\n) for line breaks in the JSON
-- Escape quotes in content with \\\"
+- Use escaped newlines (\\n) for line breaks in JSON strings
+- Properly escape all quotes in content with \\"
 
-RETURN ONLY a single JSON OBJECT with keys: title (string), content (markdown string with proper code blocks), duration (minutes as integer). Do not include any surrounding text.`;
+REQUIRED OUTPUT FORMAT:
+Return ONLY valid JSON matching this exact schema (no markdown code fences, no extra text):
 
-                const res = await model.generateContent(perPrompt);
-                const response = await res.response;
-                let text = (await response.text()).trim();
-                if (text.startsWith('```')) text = text.replace(/^```(json)?\s*/i, '').replace(/\s*```$/, '');
+{
+  "lessons": [
+    {
+      "title": "Lesson Title",
+      "content": "Detailed markdown content with proper code blocks",
+      "duration": 15
+    }
+  ]
+}
 
-                // Try direct parse
-                let obj = tryParse(text);
-                if (!obj) {
-                    // Try extract object
-                    const cand = extractObject(text);
-                    if (cand) obj = tryParse(cand);
-                }
-                if (!obj) {
-                    // Repair and try again
-                    const cand = extractObject(text) || text;
-                    const repaired = repairString(cand);
-                    obj = tryParse(repaired);
-                }
+Each lesson should:
+- Have a clear, descriptive title
+- Include comprehensive markdown content (600-1200 words)
+- Specify duration in minutes (typically 10-30 minutes)
+- Build upon previous lessons logically
 
-                if (!obj || !obj.title || !obj.content) {
-                    console.error('Failed to parse lesson', idx, 'raw:', text.substring(0, 2000));
-                    throw new Error(`Failed to parse lesson ${idx} from AI response`);
-                }
+Generate exactly ${count} lessons now.`;
 
-                lessons.push({
-                    title: String(obj.title).trim(),
-                    content: String(obj.content),
-                    duration: Number(obj.duration) || 15,
-                });
-            } catch (err) {
-                console.error('Gemini parsing error for lesson', idx, err);
-                throw new Error(`Failed to generate lesson ${idx}: ${err instanceof Error ? err.message : String(err)}`);
+        try {
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            let text = (await response.text()).trim();
+
+            // Remove markdown code fences if present
+            if (text.startsWith('```')) {
+                text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/s, '').trim();
             }
-        }
 
-        return { lessons };
+            // Parse JSON response
+            const parsed = JSON.parse(text);
+
+            // Validate response structure
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('Response is not a valid object');
+            }
+
+            if (!Array.isArray(parsed.lessons)) {
+                throw new Error('Response does not contain a "lessons" array');
+            }
+
+            if (parsed.lessons.length !== count) {
+                throw new Error(`Expected ${count} lessons, received ${parsed.lessons.length}`);
+            }
+
+            // Validate and transform lessons
+            const lessons: GeneratedLesson[] = parsed.lessons.map((lesson: any, idx: number) => {
+                if (!lesson || typeof lesson !== 'object') {
+                    throw new Error(`Lesson ${idx + 1} is not a valid object`);
+                }
+
+                if (!lesson.title || typeof lesson.title !== 'string') {
+                    throw new Error(`Lesson ${idx + 1} missing valid "title"`);
+                }
+
+                if (!lesson.content || typeof lesson.content !== 'string') {
+                    throw new Error(`Lesson ${idx + 1} missing valid "content"`);
+                }
+
+                const duration = typeof lesson.duration === 'number' ? lesson.duration : parseInt(lesson.duration, 10);
+                if (isNaN(duration) || duration <= 0) {
+                    throw new Error(`Lesson ${idx + 1} has invalid "duration"`);
+                }
+
+                return {
+                    title: lesson.title.trim(),
+                    content: lesson.content,
+                    duration: duration,
+                };
+            });
+
+            return { lessons };
+
+        } catch (err) {
+            if (err instanceof SyntaxError) {
+                throw new Error(`Failed to parse Gemini JSON response: ${err.message}`);
+            }
+            throw new Error(`Failed to generate lesson plan: ${err instanceof Error ? err.message : String(err)}`);
+        }
     }
 }
