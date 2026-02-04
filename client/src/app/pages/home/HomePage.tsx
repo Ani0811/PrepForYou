@@ -58,6 +58,7 @@ export default function HomePage() {
   const tasks: any[] = [];
   const pendingTasks = tasks.filter(t => !t.completed).slice(0, 5);
   const inProgressCourses = courses.filter(c => Number(c.progress) > 0 && Number(c.progress) < 100).slice(0, 3);
+  const completedCourses = courses.filter(c => Number(c.progress) === 100);
 
   if (loading) {
     return (
@@ -93,10 +94,10 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-display font-bold gradient-text">
-              {stats?.totalCourses ?? courses.length}
+              {courses.length}
             </div>
             <p className="text-xs text-muted-foreground font-sans">
-              {stats?.completedCourses ?? 0} completed
+              <span className="text-green-600 font-semibold">{completedCourses.length} completed</span>
             </p>
           </CardContent>
         </Card>
@@ -224,6 +225,31 @@ export default function HomePage() {
                     </div>
                   </div>
                 ))}
+                {completedCourses.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <h5 className="text-sm font-semibold text-green-600 mb-3 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Completed Courses ({completedCourses.length})
+                    </h5>
+                    {completedCourses.slice(0, 2).map((course) => (
+                      <div
+                        key={Number(course.id)}
+                        onClick={() => router.push(`/learn?courseId=${course.id}`)}
+                        className="p-3 mb-2 rounded-lg border border-green-500/20 bg-green-500/5 hover:shadow-md transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold font-display text-sm">{course.title}</h4>
+                            <p className="text-xs text-green-600">✓ Course Completed</p>
+                          </div>
+                          <Badge className="bg-green-500/10 text-green-600 border border-green-500/20 text-xs">
+                            100%
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

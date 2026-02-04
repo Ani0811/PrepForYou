@@ -89,7 +89,16 @@ export class GeminiService {
         for (let idx = 1; idx <= count; idx++) {
             try {
                 // Per-lesson prompt to reduce overall output size and improve parsing
-                const perPrompt = `You are a concise technical instructor. Produce ONE lesson (only a single JSON object) for the course "${topic}" targeting ${level} learners. This is lesson ${idx} of ${count}. ${level.toLowerCase() === 'beginner' ? 'Use simple language and explain basics.' : level.toLowerCase() === 'advanced' ? 'Use advanced concepts and concise explanations.' : 'Use clear technical language.'} RETURN ONLY a single JSON OBJECT with keys: title (string), content (markdown string), duration (minutes as integer). Ensure content uses escaped newlines (\\n) and escaped quotes (\\\"). Do not include any surrounding text.`;
+                const perPrompt = `You are a concise technical instructor. Produce ONE lesson (only a single JSON object) for the course "${topic}" targeting ${level} learners. This is lesson ${idx} of ${count}. ${level.toLowerCase() === 'beginner' ? 'Use simple language and explain basics.' : level.toLowerCase() === 'advanced' ? 'Use advanced concepts and concise explanations.' : 'Use clear technical language.'} 
+
+CRITICAL FORMATTING RULES:
+- For code examples, ALWAYS use proper markdown code blocks with triple backticks and language identifier (e.g., \`\`\`python for Python code)
+- Use inline backticks for short code references like function names or variables (e.g., \`variable_name\`, \`function()\`)
+- Ensure all code blocks have proper opening \`\`\`language and closing \`\`\` fences
+- Use escaped newlines (\\n) for line breaks in the JSON
+- Escape quotes in content with \\\"
+
+RETURN ONLY a single JSON OBJECT with keys: title (string), content (markdown string with proper code blocks), duration (minutes as integer). Do not include any surrounding text.`;
 
                 const res = await model.generateContent(perPrompt);
                 const response = await res.response;

@@ -303,12 +303,47 @@ export const getUserStats = async (req: Request, res: Response) => {
       return sum + (cp.course.duration * (cp.progress / 100));
     }, 0);
 
-    // Calculate learning streak (simplified - days with activity)
+    // Calculate learning streak (consecutive days with activity)
     const recentActivity = user.courseProgress
       .filter((cp: any) => cp.lastAccessedAt)
-      .map((cp: any) => new Date(cp.lastAccessedAt).toDateString());
-    const uniqueDays = new Set(recentActivity);
-    const learningStreak = uniqueDays.size;
+      .map((cp: any) => new Date(cp.lastAccessedAt))
+      .sort((a, b) => b.getTime() - a.getTime()); // Sort descending
+
+    let learningStreak = 0;
+    if (recentActivity.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      let currentDate = new Date(today);
+      const activityDates = new Set(
+        recentActivity.map(d => {
+          const date = new Date(d);
+          date.setHours(0, 0, 0, 0);
+          return date.getTime();
+        })
+      );
+
+      // Check if there's activity today or yesterday (to maintain streak)
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      if (activityDates.has(today.getTime())) {
+        learningStreak = 1;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else if (activityDates.has(yesterday.getTime())) {
+        learningStreak = 1;
+        currentDate = new Date(yesterday);
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        learningStreak = 0;
+      }
+
+      // Count consecutive days backwards
+      while (learningStreak > 0 && activityDates.has(currentDate.getTime())) {
+        learningStreak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      }
+    }
 
     // Get top categories
     const categoryCount: Record<string, number> = {};

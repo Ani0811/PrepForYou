@@ -7,10 +7,11 @@ import { auth } from '../../lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
-import { Trophy, TrendingUp, Clock, BookOpen, Award, Target, Flame, Lightbulb, Brain, Zap, TrendingDown } from 'lucide-react';
+import { Trophy, TrendingUp, Clock, BookOpen, Award, Target, Flame, Lightbulb, Brain, Zap, TrendingDown, CheckCircle, Download } from 'lucide-react';
 import { getUserStats } from '../../api/userApi';
 import { getCoursesWithProgress, CourseWithProgress } from '../../api/courseApi';
 import { toast } from 'sonner';
+import { Button } from '../../components/ui/button';
 
 export default function ProgressPage() {
   const router = useRouter();
@@ -61,8 +62,33 @@ export default function ProgressPage() {
   }
 
   const achievements: any[] = [];
-  const completedCourses = courses.filter(c => c.status === 'completed');
-  const inProgressCourses = courses.filter(c => c.status === 'in-progress');
+  const completedCourses = courses.filter(c => c.progress === 100);
+  const inProgressCourses = courses.filter(c => c.progress > 0 && c.progress < 100);
+
+  // Add course completion achievements
+  completedCourses.forEach(course => {
+    const completedDate = course.completedAt 
+      ? new Date(course.completedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+      : new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+    
+    achievements.push({
+      id: course.id,
+      title: `Completed: ${course.title}`,
+      description: `Successfully finished the ${course.title} course`,
+      dateEarned: completedDate,
+      badge: '🏆',
+      type: 'course-completion',
+      course: course
+    });
+  });
 
   const overallProgress = courses.length > 0
     ? Math.round(courses.reduce((sum, c) => sum + c.progress, 0) / courses.length)
@@ -70,6 +96,33 @@ export default function ProgressPage() {
 
   const learningStreak = stats?.learningStreak || 0;
   const streakTrend = learningStreak > 7 ? 'excellent' : learningStreak > 3 ? 'good' : 'needs-improvement';
+
+  const downloadCertificate = async (course: CourseWithProgress, format: 'png' | 'pdf' = 'png') => {
+    try {
+      if (format === 'pdf') {
+        const { generateCourseCertificatePDF } = await import('../../lib/certificateGenerator');
+        if (currentUser) {
+          await generateCourseCertificatePDF(
+            course,
+            currentUser.displayName || 'Student'
+          );
+          toast.success(`PDF Certificate for "${course.title}" downloaded!`);
+        }
+      } else {
+        const { generateCourseCertificate } = await import('../../lib/certificateGenerator');
+        if (currentUser) {
+          await generateCourseCertificate(
+            course,
+            currentUser.displayName || 'Student'
+          );
+          toast.success(`Certificate for "${course.title}" downloaded!`);
+        }
+      }
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast.error('Failed to generate certificate.');
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -246,29 +299,6 @@ export default function ProgressPage() {
               </div>
             </div>
           )}
-
-          {/* Improvement Areas */}
-          {analytics?.improvementAreas && analytics.improvementAreas.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="font-semibold text-sm flex items-center gap-2 font-display">
-                <Target className="h-4 w-4 text-primary" />
-                Top 3 Areas for Improvement
-              </h4>
-              <div className="space-y-2">
-                {analytics.improvementAreas.slice(0, 3).map((area: string, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 p-3 rounded-lg border gradient-bg-accent transition-all duration-300 backdrop-blur-sm hover:shadow-gradient-sm hover:scale-105"
-                  >
-                    <div className="w-6 h-6 rounded-full gradient-bg-primary flex items-center justify-center shrink-0 mt-0.5 shadow-gradient-sm transition-transform duration-300 hover:scale-110">
-                      <span className="text-xs font-bold text-primary-foreground font-display">{index + 1}</span>
-                    </div>
-                    <p className="text-sm flex-1 font-sans">{area}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -301,7 +331,11 @@ export default function ProgressPage() {
                 </p>
               ) : (
                 inProgressCourses.map((course) => (
-                  <div key={course.id} className="space-y-2 p-3 rounded-lg border gradient-card backdrop-blur-sm hover:shadow-gradient-sm transition-all duration-300 hover:scale-105">
+                  <div 
+                    key={course.id} 
+                    className="space-y-2 p-3 rounded-lg border gradient-card backdrop-blur-sm hover:shadow-gradient-sm transition-all duration-300 hover:scale-105 cursor-pointer"
+                    onClick={() => router.push(`/learn?courseId=${course.id}`)}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm font-display">{course.title}</span>
                       <Badge variant="secondary" className="gradient-bg-secondary">
@@ -311,6 +345,33 @@ export default function ProgressPage() {
                     <Progress value={course.progress} className="h-1.5" />
                   </div>
                 ))
+              )}
+
+              {completedCourses.length > 0 && (
+                <>
+                  <h4 className="font-semibold text-sm font-display mt-6 flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-4 w-4" />
+                    Completed ({completedCourses.length})
+                  </h4>
+                  {completedCourses.map((course) => (
+                    <div 
+                      key={course.id} 
+                      className="space-y-2 p-4 rounded-lg border-2 border-green-500/30 bg-green-500/10 backdrop-blur-sm hover:shadow-lg transition-all duration-300"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-sm font-display">{course.title}</span>
+                            <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs">
+                              100%
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-green-600">✓ Course Completed</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </CardContent>
@@ -329,31 +390,52 @@ export default function ProgressPage() {
               <div className="text-center py-12">
                 <Award className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground font-sans">
-                  Complete courses and tasks to earn achievements!
+                  Complete courses to earn achievements and badges!
                 </p>
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {achievements.map((achievement) => (
                   <div
-                    key={Number(achievement.id)}
-                    className="p-4 rounded-lg border gradient-card hover:shadow-gradient-md transition-all duration-500 backdrop-blur-sm hover:scale-105"
+                    key={achievement.id}
+                    className="p-4 rounded-lg border-2 border-amber-500/30 bg-linear-to-br from-amber-500/10 to-orange-500/10 hover:shadow-lg transition-all duration-500 backdrop-blur-sm hover:scale-105"
                   >
-                    <div className="flex items-start gap-3">
-                      <img
-                        src="/assets/generated/achievement-badge.dim_80x80.png"
-                        alt="Achievement"
-                        className="w-12 h-12 rounded-lg"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm line-clamp-1 font-display">{achievement.title}</h4>
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1 font-sans">
-                          {achievement.description}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-2 font-sans">
-                          {achievement.dateEarned}
-                        </p>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center text-2xl shadow-lg">
+                          {achievement.badge}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm line-clamp-1 font-display">{achievement.title}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1 font-sans">
+                            {achievement.description}
+                          </p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-sans font-medium">
+                            Earned: {achievement.dateEarned}
+                          </p>
+                        </div>
                       </div>
+                      {achievement.type === 'course-completion' && achievement.course && (
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => downloadCertificate(achievement.course, 'png')}
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 border-amber-500/50 hover:bg-amber-500/10"
+                          >
+                            <Download className="h-3 w-3 mr-2" />
+                            PNG
+                          </Button>
+                          <Button
+                            onClick={() => downloadCertificate(achievement.course, 'pdf')}
+                            size="sm"
+                            className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                          >
+                            <Download className="h-3 w-3 mr-2" />
+                            PDF
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

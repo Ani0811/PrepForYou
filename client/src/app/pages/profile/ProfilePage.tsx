@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Mail, Target, Calendar, TrendingUp, BookOpen, Clock, Pencil, Camera, Check, X, Shield, AlertTriangle, Trash2 } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser, updateProfile, GoogleAuthProvider, reauthenticateWithPopup, deleteUser as deleteFirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getUserByFirebaseUid, updateUserProfile, upsertUserOnSignIn, deleteUser, User as BackendUser } from '../../api/userApi';
+import { getUserByFirebaseUid, updateUserProfile, upsertUserOnSignIn, deleteUser, User as BackendUser, getUserStats } from '../../api/userApi';
 import { toast } from 'sonner';
 
 export default function ProfilePage() {
@@ -29,14 +29,19 @@ export default function ProfilePage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
         try {
-          const userData = await getUserByFirebaseUid(u.uid);
+          const [userData, userStatsData] = await Promise.all([
+            getUserByFirebaseUid(u.uid),
+            getUserStats(u.uid)
+          ]);
           setBackendUser(userData);
+          setStats(userStatsData.stats);
           setUsername(userData.username || u.displayName || 'No name');
           // Show custom avatar if set, otherwise show Google provider photo
           const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
@@ -61,6 +66,13 @@ export default function ProfilePage() {
               const created = await upsertUserOnSignIn(payload);
               setBackendUser(created);
               setUsername(created.username || created.displayName || u.displayName || 'No name');
+              // Fetch stats for newly created user
+              try {
+                const userStatsData = await getUserStats(u.uid);
+                setStats(userStatsData.stats);
+              } catch (e) {
+                console.warn('Failed to fetch stats for new user:', e);
+              }
               const providerGooglePhoto = u.providerData?.find((p: any) => p.providerId === 'google.com')?.photoURL;
               setAvatarPreview(providerGooglePhoto || u.photoURL || '');
               const providerGoogle = u.providerData?.some((p: any) => p.providerId === 'google.com');
@@ -270,13 +282,6 @@ export default function ProfilePage() {
     .toUpperCase()
     .slice(0, 2);
 
-  const stats = {
-    totalCourses: 0,
-    completedCourses: 0,
-    learningStreak: 0,
-    totalTimeSpent: 0
-  };
-
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -363,8 +368,8 @@ export default function ProfilePage() {
                 <div className="flex items-start gap-3">
                   <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium font-display">Role</p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm font-medium font-display text-center">Role</p>
+                    <div className="flex justify-center mt-1">
                       <span className="text-sm px-3 py-1 rounded-full bg-linear-to-r from-amber-500 to-orange-500 text-white font-semibold shadow-sm">
                         {backendUser.role === 'owner' ? 'Owner' : 'Admin'}
                       </span>

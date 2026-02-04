@@ -131,6 +131,7 @@ export default function StudyPage() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const contentSentinelRef = useRef<HTMLDivElement | null>(null);
+    const activeLessonRef = useRef<HTMLDivElement | null>(null);
     const [hasSeenContent, setHasSeenContent] = useState(false);
 
     // Auth & Data Fetching
@@ -180,6 +181,17 @@ export default function StudyPage() {
         }
     }, [activeLesson]);
 
+    // Auto-scroll sidebar to active lesson when it loads or changes
+    useEffect(() => {
+        if (activeLessonRef.current && activeLesson) {
+            // Delay scroll to avoid abrupt jump on initial load
+            const timeoutId = setTimeout(() => {
+                activeLessonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 300);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [activeLesson]);
+
     const fetchData = async (uid: string) => {
         try {
             setIsLoading(true);
@@ -187,7 +199,8 @@ export default function StudyPage() {
             // 1. Fetch Course (includes lessons)
             const courseData = await getCourseById(courseId);
             setCourse(courseData);
-            const sortedLessons = courseData.lessons || [];
+            // Ensure lessons are ordered by their `order` field so "first incomplete" is deterministic
+            const sortedLessons = (courseData.lessons || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             setLessons(sortedLessons);
 
             // 2. Fetch Progress
@@ -196,16 +209,28 @@ export default function StudyPage() {
             if (progressData) {
                 setProgressPercent(progressData.percent);
                 const completedSet = new Set(progressData.completedLessons);
+                // Set completed lessons first so active selection uses correct state
                 setCompletedLessonIds(completedSet);
 
-                // Determine active lesson: First incomplete lesson, or first lesson
+                // If a specific lessonId is provided via query param, prefer that
+                const requestedLessonId = searchParams?.get('lessonId');
+
                 if (sortedLessons.length > 0) {
-                    const firstIncomplete = sortedLessons.find(l => !completedSet.has(l.id));
-                    setActiveLesson(firstIncomplete || sortedLessons[0]);
+                    let chosen: any = null;
+                    if (requestedLessonId) {
+                        chosen = sortedLessons.find(l => l.id === requestedLessonId) || null;
+                    }
+                    // Determine active lesson: requested lesson, first incomplete lesson, or first lesson
+                    if (!chosen) chosen = sortedLessons.find(l => !completedSet.has(l.id)) || sortedLessons[0];
+                    setActiveLesson(chosen);
                 }
             } else {
                 // No progress yet (just enrolled via enrollment check presumably, or direct access)
-                if (sortedLessons.length > 0) setActiveLesson(sortedLessons[0]);
+                const requestedLessonId = searchParams?.get('lessonId');
+                if (sortedLessons.length > 0) {
+                    const requested = requestedLessonId ? sortedLessons.find(l => l.id === requestedLessonId) : null;
+                    setActiveLesson(requested || sortedLessons[0]);
+                }
             }
 
         } catch (error) {
@@ -235,14 +260,25 @@ export default function StudyPage() {
             setCompletedLessonIds(prev => new Set(prev).add(activeLesson.id));
             setProgressPercent(result.progress);
 
-            toast.success('Lesson completed!');
-
-            // Auto-advance to next lesson
             const currentIndex = lessons.findIndex(l => l.id === activeLesson.id);
-            if (currentIndex < lessons.length - 1) {
-                setActiveLesson(lessons[currentIndex + 1]);
+            const isLastLesson = currentIndex === lessons.length - 1;
+
+            if (isLastLesson) {
+                // Course completed!
+                toast.success('🎉 Course completed! Congratulations!', { duration: 5000 });
+                // Show completion modal/UI
+                setTimeout(() => {
+                    const choice = confirm('Congratulations on completing the course!\n\nClick OK to download certificate as PDF\nClick Cancel to download as PNG');
+                    if (choice) {
+                        downloadCertificate('pdf');
+                    } else {
+                        downloadCertificate('png');
+                    }
+                }, 500);
             } else {
-                toast.success('Course completed! Congratulations!');
+                toast.success('Lesson completed!');
+                // Auto-advance to next lesson
+                setActiveLesson(lessons[currentIndex + 1]);
             }
 
         } catch (error) {
@@ -250,6 +286,33 @@ export default function StudyPage() {
             toast.error('Failed to save progress.');
         } finally {
             setIsCompleting(false);
+        }
+    };
+
+    const downloadCertificate = async (format: 'png' | 'pdf' = 'png') => {
+        try {
+            if (format === 'pdf') {
+                const { generateCourseCertificatePDF } = await import('../../lib/certificateGenerator');
+                if (course && currentUser) {
+                    await generateCourseCertificatePDF(
+                        { ...course, progress: 100, status: 'completed', startedAt: null, completedAt: new Date().toISOString(), lastAccessedAt: null },
+                        currentUser.displayName || 'Student'
+                    );
+                    toast.success('PDF Certificate downloaded!');
+                }
+            } else {
+                const { generateCourseCertificate } = await import('../../lib/certificateGenerator');
+                if (course && currentUser) {
+                    await generateCourseCertificate(
+                        { ...course, progress: 100, status: 'completed', startedAt: null, completedAt: new Date().toISOString(), lastAccessedAt: null },
+                        currentUser.displayName || 'Student'
+                    );
+                    toast.success('Certificate downloaded!');
+                }
+            }
+        } catch (error) {
+            console.error('Error generating certificate:', error);
+            toast.error('Failed to generate certificate.');
         }
     };
 
@@ -285,11 +348,15 @@ export default function StudyPage() {
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Back to Courses
                     </Button>
-                    <h2 className="font-display font-bold text-xl leading-tight line-clamp-2 mb-1">{course.title}</h2>
-                    <p className="text-xs text-muted-foreground mb-3">Track your progress</p>
-                    <div className="flex items-center gap-3">
-                        <Progress value={progressPercent} className="h-2.5 flex-1" />
-                        <span className="text-sm font-bold text-primary">{progressPercent}%</span>
+                    <h2 className="font-display font-bold text-xl leading-tight line-clamp-2 mb-3">{course.title}</h2>
+                    <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg">
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-linear-to-r from-blue-500 to-blue-600 transition-all duration-500"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                        <span className="text-sm font-bold text-foreground min-w-11.25 text-right">{progressPercent}%</span>
                     </div>
                 </div>
 
@@ -306,6 +373,7 @@ export default function StudyPage() {
                             return (
                                 <div
                                     key={lesson.id}
+                                    ref={isActive ? activeLessonRef : null}
                                     onClick={() => !isLocked && handleLessonSelect(lesson)}
                                     className={`
                     group flex items-start gap-3 p-3.5 rounded-xl transition-all border-2
@@ -421,7 +489,8 @@ export default function StudyPage() {
                                         h2: ({ node, ...props }) => <h2 className="text-2xl font-bold mt-6 mb-3 font-display" {...props} />,
                                         h3: ({ node, ...props }) => <h3 className="text-xl font-bold mt-5 mb-2 font-display" {...props} />,
                                         p: ({ node, children, ...props }) => {
-                                            const regex = /(\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)+\b)/g;
+                                            // Enhanced regex to match various code patterns:
+                                            const regex = /(@\w+(?:\([^)]*\))?|\b[\w]+\[[^\]]+\](?:\.\w+(?:\([^)]*\))?)*|\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*\([^)]*\)(?:\.[a-zA-Z_][\w]*(?:\([^)]*\))?)*|\b[a-zA-Z_][\w]*\.[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*\b|\b[A-Z_][A-Z0-9_]{2,}\b)/g;
                                             const mapChild = (child: any, idxBase = 0) => {
                                                 if (typeof child !== 'string') return child;
                                                 const parts: any[] = [];
@@ -450,7 +519,8 @@ export default function StudyPage() {
                                         ul: ({ node, ...props }) => <ul className="list-disc pl-6 mb-4 space-y-2" {...props} />,
                                         ol: ({ node, ...props }) => <ol className="list-decimal pl-6 mb-4 space-y-2" {...props} />,
                                         li: ({ node, children, ...props }) => {
-                                            const regex = /(\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)+\b)/g;
+                                            // Enhanced regex for list items - same patterns as paragraphs
+                                            const regex = /(@\w+(?:\([^)]*\))?|\b[\w]+\[[^\]]+\](?:\.\w+(?:\([^)]*\))?)*|\b[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*\([^)]*\)(?:\.[a-zA-Z_][\w]*(?:\([^)]*\))?)*|\b[a-zA-Z_][\w]*\.[a-zA-Z_][\w]*(?:\.[a-zA-Z_][\w]*)*\b|\b[A-Z_][A-Z0-9_]{2,}\b)/g;
                                             const mapChild = (child: any, idxBase = 0) => {
                                                 if (typeof child !== 'string') return child;
                                                 const parts: any[] = [];
@@ -488,7 +558,11 @@ export default function StudyPage() {
                                         blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-primary/50 pl-4 italic my-6 text-muted-foreground bg-primary/5 py-2 pr-2 rounded-r" {...props} />,
                                     }}
                                 >
-                                    {activeLesson.content.replace(/\\n/g, '\n')}
+                                    {activeLesson.content
+                                        .replace(/\\n/g, '\n')
+                                        .replace(/\\`/g, '`')
+                                        .replace(/\\t/g, '\t')
+                                    }
                                 </ReactMarkdown>
                             </div>
                         </div>
@@ -518,19 +592,47 @@ export default function StudyPage() {
                             Previous
                         </Button>
 
-                        <Button
-                            onClick={handleCompleteLesson}
-                            disabled={isCompleting || isCompleteLocked}
-                            title={isCompleteLocked ? 'Scroll to the end of the lesson to unlock' : undefined}
-                            className={`flex-1 md:flex-none font-bold text-base px-6 transition-transform ${completedLessonIds.has(activeLesson.id)
-                                ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
-                                : "gradient-bg-primary shadow-lg shadow-primary/30"
-                                } ${isCompleteLocked ? 'opacity-60 cursor-not-allowed hover:shadow-none hover:scale-100' : 'hover:scale-[1.02] hover:shadow-xl'}`}
-                        >
-                            {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {completedLessonIds.has(activeLesson.id) ? 'Next Lesson' : 'Complete & Continue'}
-                            {!isCompleting && <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />}
-                        </Button>
+                        {(() => {
+                            const currentIndex = lessons.findIndex(l => l.id === activeLesson.id);
+                            const isLastLesson = currentIndex === lessons.length - 1;
+                            const isCurrentCompleted = completedLessonIds.has(activeLesson.id);
+
+                            if (isLastLesson && isCurrentCompleted) {
+                                return (
+                                    <>
+                                        <Button
+                                            onClick={() => downloadCertificate('pdf')}
+                                            className="flex-1 md:flex-none font-bold text-base px-6 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:scale-[1.02] transition-transform"
+                                        >
+                                            📜 Claim Certificate
+                                        </Button>
+                                        <Button
+                                            onClick={() => router.push('/courses')}
+                                            variant="outline"
+                                            className="flex-1 md:flex-none font-semibold hover:scale-[1.02] transition-transform"
+                                        >
+                                            Back to Courses
+                                        </Button>
+                                    </>
+                                );
+                            }
+
+                            return (
+                                <Button
+                                    onClick={handleCompleteLesson}
+                                    disabled={isCompleting || isCompleteLocked}
+                                    title={isCompleteLocked ? 'Scroll to the end of the lesson to unlock' : undefined}
+                                    className={`flex-1 md:flex-none font-bold text-base px-6 transition-transform ${isCurrentCompleted
+                                        ? "bg-linear-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30"
+                                        : "gradient-bg-primary shadow-lg shadow-primary/30"
+                                        } ${isCompleteLocked ? 'opacity-60 cursor-not-allowed hover:shadow-none hover:scale-100' : 'hover:scale-[1.02] hover:shadow-xl'}`}
+                                >
+                                    {isCompleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {isCurrentCompleted ? (isLastLesson ? 'Course Complete!' : 'Next Lesson') : 'Complete & Continue'}
+                                    {!isCompleting && !isLastLesson && <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />}
+                                </Button>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
