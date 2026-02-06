@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Clock, BookOpen, BarChart, Calendar, Award, Heart, Share2, Download } from 'lucide-react';
+import { Clock, BookOpen, BarChart, Calendar, Award, Share2, Download, Bookmark, BookmarkCheck } from 'lucide-react';
 import { CourseWithProgress } from '../../api/courseApi';
+import { getUserByFirebaseUid, toggleUserSavedCourse } from '../../api/userApi';
 import { toast } from 'sonner';
 import { generateCourseCertificate } from '../../lib/certificateGenerator';
 import { auth } from '../../lib/firebase';
@@ -21,16 +22,99 @@ interface Props {
 
 export default function CourseDetailsModal({ open, onOpenChange, course, onEnroll, isEnrolling }: Props) {
     const [isDownloadingCertificate, setIsDownloadingCertificate] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
     
+    // Check saved state when modal opens
+    useEffect(() => {
+        const checkSavedState = async () => {
+            const currentUser = auth.currentUser;
+            if (!currentUser || !course) return;
+
+            try {
+                const userAny = (await getUserByFirebaseUid(currentUser.uid)) as any;
+                if (userAny?.savedCourses) {
+                    setIsSaved(userAny.savedCourses.includes(course.id));
+                }
+            } catch (error) {
+                console.error('Error checking saved state:', error);
+            }
+        };
+
+        if (open && course) {
+            checkSavedState();
+        }
+    }, [open, course]);
+
     if (!course) return null;
 
-    const handleSaveForLater = () => {
-        toast.success("Course saved for later!");
+    const handleSaveForLater = async () => {
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser) {
+            toast.error("Please sign in to save courses");
+            return;
+        }
+
+        if (!course) return;
+
+        const previousState = isSaved;
+        const newState = !isSaved;
+        
+        // Optimistic update
+        setIsSaved(newState);
+
+        try {
+            const data = await toggleUserSavedCourse(currentUser.uid, course.id, newState ? 'save' : 'unsave');
+            // backend should return { isSaved: boolean }
+            if (data && typeof data.isSaved === 'boolean') {
+                setIsSaved(data.isSaved);
+                toast.success(data.isSaved ? "Course saved for later! 📚" : "Removed from saved courses");
+            } else {
+                // unexpected response, rollback
+                setIsSaved(previousState);
+                console.error('Unexpected response updating saved course:', data);
+                toast.error("Failed to update saved state");
+            }
+        } catch (error) {
+            // Rollback on error
+            setIsSaved(previousState);
+            console.error('Error saving course:', error);
+            toast.error("Failed to update saved state");
+        }
     };
 
-    const handleShare = () => {
-        navigator.clipboard.writeText(window.location.href);
-        toast.success("Link copied to clipboard!");
+    const handleShare = async () => {
+        const shareUrl = `${window.location.origin}/courses?courseId=${course.id}`;
+        const shareData = {
+            title: course.title,
+            text: `Check out this course: ${course.title}`,
+            url: shareUrl
+        };
+
+        try {
+            // Try native share API first (mobile/modern browsers)
+            if (navigator.share) {
+                await navigator.share(shareData);
+                // No toast needed for native share
+            } else {
+                // Fallback to clipboard
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success("Link copied to clipboard!");
+            }
+        } catch (error: any) {
+            // Handle user cancellation or other errors
+            if (error.name !== 'AbortError') {
+                console.error('Error sharing:', error);
+                // Try clipboard as final fallback
+                try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    toast.success("Link copied to clipboard!");
+                } catch (clipboardError) {
+                    console.error('Clipboard error:', clipboardError);
+                    toast.error("Failed to share course");
+                }
+            }
+        }
     };
 
     const handleDownloadCertificate = async () => {
@@ -45,8 +129,7 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
         try {
             await generateCourseCertificate(
                 course,
-                currentUser.displayName || 'Student',
-                currentUser.email || ''
+                currentUser.displayName || 'Student'
             );
             toast.success("Certificate downloaded successfully! 🎉");
         } catch (error) {
@@ -262,8 +345,17 @@ export default function CourseDetailsModal({ open, onOpenChange, course, onEnrol
 
                             <div className="grid grid-cols-2 gap-2">
                                 <Button variant="outline" size="sm" className="w-full h-9 text-xs font-semibold" onClick={handleSaveForLater}>
-                                    <Heart className="mr-1.5 h-3.5 w-3.5" />
-                                    Save
+                                    {isSaved ? (
+                                        <>
+                                            <BookmarkCheck className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                                            Saved
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Bookmark className="mr-1.5 h-3.5 w-3.5" />
+                                            Save
+                                        </>
+                                    )}
                                 </Button>
                                 <Button variant="outline" size="sm" className="w-full h-9 text-xs font-semibold" onClick={handleShare}>
                                     <Share2 className="mr-1.5 h-3.5 w-3.5" />

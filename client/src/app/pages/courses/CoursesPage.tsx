@@ -1,40 +1,74 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { BookOpen, Clock, Award } from 'lucide-react';
+import { BookOpen, Clock, Award, Bookmark, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getCoursesWithProgress, updateCourseProgress, type CourseWithProgress } from '../../api/courseApi';
+import { getCoursesWithProgress, updateCourseProgress, getCourseById, type CourseWithProgress, type Course } from '../../api/courseApi';
+import { getUserByFirebaseUid, toggleUserSavedCourse } from '../../api/userApi';
 import { toast } from 'sonner';
 import { CourseDetailsModal } from '../../components/modals';
 import confetti from 'canvas-confetti';
 
 export default function CoursesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
+  const [savedCourses, setSavedCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavedLoading, setIsSavedLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedCourse, setSelectedCourse] = useState<CourseWithProgress | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
+  const [activeTab, setActiveTab] = useState('All');
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       if (u) {
         fetchCourses(u.uid);
+        fetchSavedCourses(u.uid);
       } else {
         setIsLoading(false);
       }
     });
     return () => unsub();
   }, []);
+
+  // Handle courseId from URL query params
+  useEffect(() => {
+    const courseId = searchParams.get('courseId');
+    if (courseId && user) {
+      // Fetch the course and open the modal
+      getCourseById(courseId)
+        .then((course) => {
+          // Convert Course to CourseWithProgress
+          const courseWithProgress: CourseWithProgress = {
+            ...course,
+            progress: 0,
+            status: 'not-started',
+            startedAt: null,
+            completedAt: null,
+            lastAccessedAt: null
+          };
+          setSelectedCourse(courseWithProgress);
+          setIsDetailsModalOpen(true);
+        })
+        .catch((error) => {
+          console.error('Error fetching course from URL:', error);
+          toast.error('Course not found');
+          // Remove invalid courseId from URL
+          router.replace('/courses');
+        });
+    }
+  }, [searchParams, user, router]);
 
   const fetchCourses = async (firebaseUid: string, category?: string) => {
     setIsLoading(true);
@@ -50,14 +84,75 @@ export default function CoursesPage() {
     }
   };
 
+  const fetchSavedCourses = async (firebaseUid: string) => {
+    setIsSavedLoading(true);
+    try {
+      const userAny: any = await getUserByFirebaseUid(firebaseUid);
+      const savedIds: string[] = userAny?.savedCourses || [];
+
+      if (savedIds.length === 0) {
+        setSavedCourses([]);
+        return;
+      }
+
+      const fetchedCourses = await Promise.all(
+        savedIds.map(async (id) => {
+          try {
+            return await getCourseById(id);
+          } catch (error) {
+            console.error(`Error fetching course ${id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      setSavedCourses(fetchedCourses.filter((c): c is Course => c !== null));
+    } catch (error: any) {
+      console.error('Error fetching saved courses:', error);
+      toast.error('Failed to load saved courses');
+      setSavedCourses([]);
+    } finally {
+      setIsSavedLoading(false);
+    }
+  };
+
   const handleCategoryChange = (category: string) => {
+    setActiveTab(category);
+    if (category === 'Saved') {
+      return;
+    }
     setSelectedCategory(category);
     if (user) {
       fetchCourses(user.uid, category === 'All' ? undefined : category);
     }
   };
 
-  const categories = ['All', ...Array.from(new Set(courses.map(c => c.category)))];
+  const handleRemoveSavedCourse = async (courseId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user) {
+      toast.error('Please sign in');
+      return;
+    }
+
+    const previousSaved = savedCourses;
+    setSavedCourses(savedCourses.filter((c) => c.id !== courseId));
+
+    try {
+      const res: any = await toggleUserSavedCourse(user.uid, courseId, 'unsave');
+      if (res && typeof res.isSaved === 'boolean') {
+        toast.success('Removed from saved courses');
+      } else {
+        throw new Error('Unexpected response');
+      }
+    } catch (error) {
+      console.error('Failed to remove saved course:', error);
+      setSavedCourses(previousSaved);
+      toast.error('Failed to remove saved course');
+    }
+  };
+
+  const categories = ['All', ...Array.from(new Set(courses.map(c => c.category))), 'Saved'];
 
   const getCoursesByCategory = (category: string) => {
     if (category === 'All') return courses;
@@ -71,8 +166,18 @@ export default function CoursesPage() {
   };
 
   const openCourseDetails = (course: CourseWithProgress) => {
+    // Navigate to course URL for shareability
+    router.push(`/courses?courseId=${course.id}`);
+    // Optimistically set state for immediate UI feedback
     setSelectedCourse(course);
     setIsDetailsModalOpen(true);
+  };
+
+  const closeCourseDetails = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedCourse(null);
+    // Remove courseId from URL
+    router.replace('/courses');
   };
 
   const handleEnroll = async () => {
@@ -141,7 +246,7 @@ export default function CoursesPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="All" className="w-full" onValueChange={handleCategoryChange}>
+      <Tabs value={activeTab} defaultValue="All" className="w-full" onValueChange={handleCategoryChange}>
         <div className="flex items-center justify-start mb-6 overflow-x-auto pb-2 scrollbar-hide">
           <TabsList className="bg-transparent h-auto p-0 gap-3">
             {categories.map((category) => (
@@ -153,8 +258,9 @@ export default function CoursesPage() {
                            data-[state=active]:gradient-bg-primary data-[state=active]:text-primary-foreground 
                            data-[state=active]:border-transparent data-[state=active]:shadow-lg
                            hover:border-primary/40 hover:bg-primary/5
-                           shadow-sm cursor-pointer"
+                           shadow-sm cursor-pointer flex items-center gap-2"
               >
+                {category === 'Saved' && <Bookmark className="h-3.5 w-3.5" />}
                 {category}
               </TabsTrigger>
             ))}
@@ -163,7 +269,115 @@ export default function CoursesPage() {
 
         {categories.map((category) => (
           <TabsContent key={category} value={category} className="mt-0 focus-visible:outline-none">
-            {isLoading ? (
+            {category === 'Saved' ? (
+              isSavedLoading ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="animate-pulse bg-card/30 backdrop-blur-sm border-2 border-border/50 rounded-2xl h-85">
+                      <CardHeader className="p-6">
+                        <div className="w-12 h-12 bg-muted/50 rounded-xl mb-3" />
+                        <div className="h-6 bg-muted/50 rounded-lg w-3/4" />
+                      </CardHeader>
+                      <CardContent className="p-6 pt-0 space-y-4">
+                        <div className="space-y-2">
+                          <div className="h-3 bg-muted/50 rounded w-full" />
+                          <div className="h-3 bg-muted/50 rounded w-5/6" />
+                        </div>
+                        <div className="h-10 bg-muted/50 rounded-xl w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : savedCourses.length === 0 ? (
+                <Card className="backdrop-blur-xl bg-card/20 border-2 border-dashed border-border/50 rounded-4xl overflow-hidden">
+                  <CardContent className="flex flex-col items-center justify-center py-24 text-center">
+                    <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+                      <Bookmark className="h-10 w-10 text-primary" />
+                    </div>
+                    <h3 className="text-2xl font-display font-bold mb-3">No saved courses</h3>
+                    <p className="text-muted-foreground text-base font-sans max-w-sm">Save courses you're interested in to access them later. Click the bookmark icon on any course!</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {savedCourses.map((course) => (
+                    <Card
+                      key={course.id}
+                      className="group relative flex flex-col h-full bg-card/40 backdrop-blur-xl border-2 border-border/50 rounded-[28px] overflow-hidden transition-all duration-500 hover:border-primary/50 hover:shadow-xl hover:-translate-y-2"
+                      onClick={() => {
+                        const courseWithProgress: CourseWithProgress = {
+                          ...course,
+                          progress: 0,
+                          status: 'not-started',
+                          startedAt: null,
+                          completedAt: null,
+                          lastAccessedAt: null
+                        };
+                        openCourseDetails(courseWithProgress);
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                      <CardHeader className="relative p-6 pb-3">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg border border-primary/20">
+                            <BookOpen className="h-6 w-6 text-primary" />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                            onClick={(e) => handleRemoveSavedCourse(course.id, e)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <CardTitle className="text-xl font-display font-bold leading-tight group-hover:text-primary transition-colors duration-300">
+                          {course.title}
+                        </CardTitle>
+                      </CardHeader>
+
+                      <CardContent className="relative flex-1 p-6 pt-0 space-y-6">
+                        <p className="text-muted-foreground text-sm line-clamp-3 leading-relaxed font-sans font-medium opacity-80 group-hover:opacity-100 transition-opacity duration-300">
+                          {course.description}
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/30 border border-border/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            <Award className="h-3.5 w-3.5 text-primary" />
+                            {course.category}
+                          </div>
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/30 border border-border/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            <Clock className="h-3.5 w-3.5 text-orange-500" />
+                            {Math.round(course.duration / 60)}h
+                          </div>
+                        </div>
+
+                        <div className="pt-2 mt-auto">
+                          <Button
+                            className="w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 gradient-bg-primary hover:shadow-lg group-hover:translate-y-0.5 active:scale-95"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const courseWithProgress: CourseWithProgress = {
+                                ...course,
+                                progress: 0,
+                                status: 'not-started',
+                                startedAt: null,
+                                completedAt: null,
+                                lastAccessedAt: null
+                              };
+                              openCourseDetails(courseWithProgress);
+                            }}
+                          >
+                            View Course
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )
+            ) : isLoading ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Card key={i} className="animate-pulse bg-card/30 backdrop-blur-sm border-2 border-border/50 rounded-2xl h-85">
@@ -272,7 +486,11 @@ export default function CoursesPage() {
 
       <CourseDetailsModal
         open={isDetailsModalOpen}
-        onOpenChange={setIsDetailsModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCourseDetails();
+          }
+        }}
         course={selectedCourse}
         onEnroll={handleEnroll}
         isEnrolling={isEnrolling}

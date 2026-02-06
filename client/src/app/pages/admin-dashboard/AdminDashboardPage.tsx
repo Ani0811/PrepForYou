@@ -85,7 +85,6 @@ interface User {
   username: string | null;
   role: string;
   avatarUrl: string | null;
-  signInCount: number;
   lastSignInAt: string | null;
   isActive: boolean;
 }
@@ -778,7 +777,7 @@ export default function AdminDashboardPage() {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead className="font-display px-4 py-3 border-r border-border/50">User</TableHead>
                   <TableHead className="font-display px-4 py-3 border-r border-border/50">Role</TableHead>
-                  <TableHead className="font-display px-4 py-3 border-r border-border/50">Sign-ins</TableHead>
+                  <TableHead className="font-display px-4 py-3 border-r border-border/50">Status</TableHead>
                   <TableHead className="font-display px-4 py-3 border-r border-border/50">Last Sign In</TableHead>
                   <TableHead className="font-display text-right px-4 py-3">Actions</TableHead>
                 </TableRow>
@@ -815,7 +814,16 @@ export default function AdminDashboardPage() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="px-4 py-3 border-r border-border/50">{user.signInCount}</TableCell>
+                    <TableCell className="px-4 py-3 border-r border-border/50">
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                        user.isActive 
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                          : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground px-4 py-3 border-r border-border/50">
                       {user.lastSignInAt
                         ? (() => {

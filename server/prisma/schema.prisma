@@ -23,6 +23,7 @@ model User {
   metadata            Json      @default("{}") @db.JsonB
   isActive            Boolean   @default(true) @map("is_active")
   role                String    @default("user") // owner, admin, user
+  savedCourses        String[]  @default([]) @map("saved_courses")
 
   courseProgress      CourseProgress[]
 

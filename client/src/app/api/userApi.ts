@@ -105,6 +105,38 @@ export async function getUserByFirebaseUid(firebaseUid: string): Promise<User> {
 }
 
 /**
+ * Toggle saved course for a user (save or unsave)
+ */
+export async function toggleUserSavedCourse(firebaseUid: string, courseId: string, action: 'save' | 'unsave') {
+  const url = `${API_URL}/users/${firebaseUid}/saved-courses`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ courseId, action }),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    const body = err.body;
+    const details = body && (body.details || body.error || body.message);
+    const msg = details || String(body) || 'Failed to update saved courses';
+    const errMsg = `${response.status} ${msg}`;
+    console.error('API error:', { url, status: response.status, body });
+    throw new Error(errMsg);
+  }
+
+  try {
+    const data = await response.json();
+    return data;
+  } catch (e) {
+    const text = await response.text().catch(() => null);
+    return { isSaved: null, raw: text };
+  }
+}
+
+/**
  * Update user profile (username and/or avatar)
  */
 export async function updateUserProfile(

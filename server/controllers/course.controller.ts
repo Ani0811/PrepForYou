@@ -390,7 +390,7 @@ export const createCourse = async (req: Request, res: Response) => {
         imageUrl: imageUrl || null,
         tags: tags || [],
         difficulty: difficulty || 'beginner',
-        isPublished: false, // Always start unpublished
+        isPublished: true, // Mark as published by default since it is active
         lessons: lessons && lessons.length > 0 ? {
           create: lessons.map((lesson: any) => ({
             title: lesson.title,

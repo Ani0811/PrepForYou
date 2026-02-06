@@ -7,6 +7,7 @@ import {
   getAllUsers,
   updateUserRole,
   getUserStats,
+  toggleSavedCourse,
 } from '../controllers/user.controller';
 
 const router = Router();
@@ -23,6 +24,13 @@ router.post('/signin', upsertUserOnSignIn);
  * Get user stats and learning analytics
  */
 router.get('/:firebaseUid/stats', getUserStats);
+
+/**
+ * POST /api/users/:firebaseUid/saved-courses
+ * Toggle saved course
+ * Body: { courseId: string, action: 'save' | 'unsave' }
+ */
+router.post('/:firebaseUid/saved-courses', toggleSavedCourse);
 
 /**
  * GET /api/users/:firebaseUid

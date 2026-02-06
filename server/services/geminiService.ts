@@ -25,7 +25,8 @@ export class GeminiService {
             model: "gemini-2.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
-                maxOutputTokens: 8192,
+                maxOutputTokens: 65536,
+                temperature: 0.7,
             }
         });
         return this.model;
@@ -71,9 +72,12 @@ Return ONLY valid JSON matching this exact schema (no markdown code fences, no e
 
 Each lesson should:
 - Have a clear, descriptive title
-- Include comprehensive markdown content (600-1200 words)
-- Specify duration in minutes (typically 10-30 minutes)
+- Include well-structured markdown content (400-800 words)
+- Specify duration in minutes (typically 10-25 minutes)
 - Build upon previous lessons logically
+- Keep JSON strings properly formatted and escaped
+
+IMPORTANT: Keep content concise but informative. Ensure the entire JSON response is complete and valid.
 
 Generate exactly ${count} lessons now.`;
 
@@ -82,13 +86,114 @@ Generate exactly ${count} lessons now.`;
             const response = await result.response;
             let text = (await response.text()).trim();
 
+            // Log response length for debugging
+            console.log(`[GeminiService] Received response of ${text.length} characters, ${count} lessons requested`);
+
             // Remove markdown code fences if present
             if (text.startsWith('```')) {
                 text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/s, '').trim();
             }
 
-            // Parse JSON response
-            const parsed = JSON.parse(text);
+            // Parse JSON response with fallbacks for minor formatting issues
+            function tryParseJSON(input: string): any | null {
+                try {
+                    return JSON.parse(input);
+                } catch (e) {
+                    console.log('[GeminiService] Direct JSON parse failed, attempting repairs...');
+                    // attempt to extract the first JSON object in the text
+                    const first = input.indexOf('{');
+                    const last = input.lastIndexOf('}');
+                    if (first !== -1 && last !== -1 && last > first) {
+                        let candidate = input.slice(first, last + 1);
+                        // remove trailing commas before closing braces/brackets
+                        candidate = candidate.replace(/,\s*([}\]])/g, '$1');
+                        // replace smart quotes with straight quotes
+                        candidate = candidate.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+                        try {
+                            return JSON.parse(candidate);
+                        } catch (e2) {
+                            console.log('[GeminiService] Repaired JSON parse also failed, attempting lesson recovery...');
+                        }
+
+                        // Try 3: Extract complete lesson objects individually
+                        try {
+                            const lessonsStart = candidate.indexOf('"lessons"');
+                            if (lessonsStart !== -1) {
+                                const arrayStart = candidate.indexOf('[', lessonsStart);
+                                if (arrayStart !== -1) {
+                                    const lessons = [];
+                                    let depth = 0;
+                                    let currentLesson = '';
+                                    let inString = false;
+                                    let escape = false;
+                                    let captureStarted = false;
+
+                                    for (let i = arrayStart + 1; i < candidate.length; i++) {
+                                        const char = candidate[i];
+
+                                        if (escape) {
+                                            if (captureStarted) currentLesson += char;
+                                            escape = false;
+                                            continue;
+                                        }
+                                        if (char === '\\') {
+                                            if (captureStarted) currentLesson += char;
+                                            escape = true;
+                                            continue;
+                                        }
+                                        if (char === '"') {
+                                            if (captureStarted) currentLesson += char;
+                                            inString = !inString;
+                                            continue;
+                                        }
+                                        if (inString) {
+                                            if (captureStarted) currentLesson += char;
+                                            continue;
+                                        }
+
+                                        if (char === '{') {
+                                            depth++;
+                                            captureStarted = true;
+                                            currentLesson += char;
+                                        } else if (char === '}') {
+                                            currentLesson += char;
+                                            depth--;
+                                            if (depth === 0 && captureStarted) {
+                                                try {
+                                                    const lesson = JSON.parse(currentLesson.trim());
+                                                    if (lesson.title && lesson.content) {
+                                                        lessons.push(lesson);
+                                                    }
+                                                } catch {}
+                                                currentLesson = '';
+                                                captureStarted = false;
+                                            }
+                                        } else if (captureStarted) {
+                                            currentLesson += char;
+                                        }
+                                    }
+
+                                    if (lessons.length > 0) {
+                                        console.log(`[GeminiService] Recovered ${lessons.length} complete lessons from malformed JSON`);
+                                        return { lessons };
+                                    }
+                                }
+                            }
+                        } catch (e3) {
+                            console.log('[GeminiService] Lesson recovery also failed');
+                        }
+                    }
+                    return null;
+                }
+            }
+
+            const parsed = tryParseJSON(text);
+            if (!parsed) {
+                console.error('[GeminiService] Failed to parse response. Length:', text.length);
+                console.error('[GeminiService] First 2000 chars:', text.slice(0, 2000));
+                console.error('[GeminiService] Last 500 chars:', text.slice(-500));
+                throw new SyntaxError(`Could not parse JSON response from Gemini. Response length: ${text.length} chars. See server logs for details.`);
+            }
 
             // Validate response structure
             if (!parsed || typeof parsed !== 'object') {
@@ -99,8 +204,12 @@ Generate exactly ${count} lessons now.`;
                 throw new Error('Response does not contain a "lessons" array');
             }
 
-            if (parsed.lessons.length !== count) {
-                throw new Error(`Expected ${count} lessons, received ${parsed.lessons.length}`);
+            if (parsed.lessons.length === 0) {
+                throw new Error('No valid lessons found in response');
+            }
+
+            if (parsed.lessons.length < count) {
+                console.warn(`[GeminiService] Expected ${count} lessons, but recovered ${parsed.lessons.length}. Proceeding with partial result.`);
             }
 
             // Validate and transform lessons

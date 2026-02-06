@@ -120,3 +120,11 @@ CREATE TRIGGER set_course_started_at
 BEFORE UPDATE ON course_progress
 FOR EACH ROW
 EXECUTE FUNCTION set_started_at();
+
+-- Add saved_courses column to users table (for Save for Later feature)
+-- This allows users to bookmark courses for future enrollment
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS saved_courses text[] DEFAULT ARRAY[]::text[];
+
+-- Index for saved courses lookups
+CREATE INDEX IF NOT EXISTS users_saved_courses_idx ON users USING GIN (saved_courses);

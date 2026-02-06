@@ -19,7 +19,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     ] = await Promise.all([
       prisma.user.count({ where: { isActive: true } }),
       prisma.course.count({ where: { isActive: true } }),
-      prisma.course.count({ where: { isPublished: true, isActive: true } }),
+      prisma.course.count({ where: { isActive: true } }), // Treated as published if active
       prisma.courseProgress.count(),
       prisma.courseProgress.count({ where: { status: 'in-progress' } }),
       prisma.courseProgress.count({ where: { status: 'completed' } }),
@@ -268,9 +268,18 @@ export const toggleCoursePublished = async (req: Request, res: Response) => {
       }
     }
 
+    // Constraint: if isPublished is true, isActive must also be true
+    // If unpublishing (isPublished: false), also set isActive to false
+    const updateData: any = { isPublished };
+    if (isPublished === true) {
+      updateData.isActive = true;
+    } else if (isPublished === false) {
+      updateData.isActive = false;
+    }
+
     const course = await prisma.course.update({
       where: { id: courseId },
-      data: { isPublished },
+      data: updateData,
     });
 
     return res.status(200).json({
@@ -605,13 +614,7 @@ export const reportUser = async (req: Request, res: Response) => {
     }
 
     // Log report (in production, store in dedicated reports table)
-    console.log('User Report:', {
-      userId,
-      userEmail: user.email,
-      reason,
-      details,
-      timestamp: new Date().toISOString(),
-    });
+    // TODO: create a report record in the reports table and return its ID.
 
     // Return success (in production, create report record)
     return res.status(200).json({
@@ -668,18 +671,27 @@ export const updateCourse = async (req: Request, res: Response) => {
     // Use transaction for course update and lesson synchronization
     const result = await prisma.$transaction(async (tx) => {
       // 1. Update course details
+      const updateData: any = {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(category !== undefined && { category }),
+        ...(duration !== undefined && { duration: Number(duration) }),
+        ...(difficulty !== undefined && { difficulty }),
+        ...(imageUrl !== undefined && { imageUrl }),
+        ...(tags !== undefined && { tags }),
+        ...(isPublished !== undefined && { isPublished }),
+      };
+
+      // Constraint: if isPublished is true, isActive must also be true
+      if (isPublished === true) {
+        updateData.isActive = true;
+      } else if (isPublished === false) {
+        updateData.isActive = false;
+      }
+
       const updatedCourse = await tx.course.update({
         where: { id: courseId },
-        data: {
-          ...(title !== undefined && { title }),
-          ...(description !== undefined && { description }),
-          ...(category !== undefined && { category }),
-          ...(duration !== undefined && { duration: Number(duration) }),
-          ...(difficulty !== undefined && { difficulty }),
-          ...(imageUrl !== undefined && { imageUrl }),
-          ...(tags !== undefined && { tags }),
-          ...(isPublished !== undefined && { isPublished }),
-        },
+        data: updateData,
       });
 
       // 2. Synchronize lessons if provided

@@ -293,14 +293,23 @@ export const getUserStats = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Calculate stats
-    const totalCourses = user.courseProgress.length;
-    const completedCourses = user.courseProgress.filter((p: any) => p.status === 'completed').length;
-    const inProgressCourses = user.courseProgress.filter((p: any) => p.status === 'in-progress').length;
-    
-    // Calculate total time spent (sum of course durations for courses with progress)
-    const totalTimeSpent = user.courseProgress.reduce((sum: number, cp: any) => {
-      return sum + (cp.course.duration * (cp.progress / 100));
+    // Only consider course progress entries for active courses
+    const filteredProgress = user.courseProgress.filter((cp: any) => {
+      return cp.course && cp.course.isActive !== false;
+    });
+
+    // Debug logging removed to avoid noisy server logs in production
+
+    // Calculate stats based on filtered progress
+    const totalCourses = filteredProgress.length;
+    const completedCourses = filteredProgress.filter((p: any) => p.status === 'completed').length;
+    const inProgressCourses = filteredProgress.filter((p: any) => p.status === 'in-progress').length;
+
+    // Calculate total time spent (sum of course durations for filtered courses with progress)
+    const totalTimeSpent = filteredProgress.reduce((sum: number, cp: any) => {
+      const courseDuration = cp.course?.duration || 0;
+      const progressPercent = typeof cp.progress === 'number' ? cp.progress : Number(cp.progress) || 0;
+      return sum + (courseDuration * (progressPercent / 100));
     }, 0);
 
     // Calculate learning streak (consecutive days with activity)
@@ -347,8 +356,8 @@ export const getUserStats = async (req: Request, res: Response) => {
 
     // Get top categories
     const categoryCount: Record<string, number> = {};
-    user.courseProgress.forEach((cp: any) => {
-      const category = cp.course.category;
+    filteredProgress.forEach((cp: any) => {
+      const category = cp.course?.category || 'Uncategorized';
       categoryCount[category] = (categoryCount[category] || 0) + 1;
     });
     const topCategories = Object.entries(categoryCount)
@@ -357,10 +366,10 @@ export const getUserStats = async (req: Request, res: Response) => {
       .map(([category]) => category);
 
     // Get courses needing attention (low progress)
-    const improvementAreas = user.courseProgress
-      .filter((cp: any) => cp.status === 'in-progress' && cp.progress < 30)
+    const improvementAreas = filteredProgress
+      .filter((cp: any) => cp.status === 'in-progress' && (cp.progress || 0) < 30)
       .slice(0, 3)
-      .map((cp: any) => cp.course.title);
+      .map((cp: any) => cp.course?.title || 'Untitled Course');
 
     const stats = {
       totalCourses,
@@ -379,11 +388,90 @@ export const getUserStats = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
+      user: {
+        id: user.id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        displayName: user.displayName,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        role: user.role,
+        savedCourses: (user as any).savedCourses,
+      },
       stats,
       analytics,
     });
   } catch (error: any) {
     console.error('Error fetching user stats:', error);
     return res.status(500).json({ error: 'Failed to fetch user stats', details: error.message });
+  }
+};
+
+/**
+ * Toggle saved course (save or unsave)
+ * POST /api/users/:firebaseUid/saved-courses
+ * Body: { courseId: string, action: 'save' | 'unsave' }
+ */
+export const toggleSavedCourse = async (req: Request, res: Response) => {
+  try {
+    const firebaseUidParam = req.params.firebaseUid;
+    const firebaseUid = Array.isArray(firebaseUidParam) ? firebaseUidParam[0] : firebaseUidParam;
+    const { courseId, action } = req.body;
+
+    if (!courseId || !action) {
+      return res.status(400).json({ error: 'courseId and action are required' });
+    }
+
+    if (action !== 'save' && action !== 'unsave') {
+      return res.status(400).json({ error: 'action must be "save" or "unsave"' });
+    }
+
+    // Verify course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { firebaseUid },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Toggle saved state
+    const userSaved = (user as any).savedCourses;
+    let updatedSavedCourses = Array.isArray(userSaved) ? [...userSaved] : [];
+
+    if (action === 'save') {
+      if (!updatedSavedCourses.includes(courseId)) {
+        updatedSavedCourses.push(courseId);
+      }
+    } else {
+      updatedSavedCourses = updatedSavedCourses.filter(id => id !== courseId);
+    }
+
+    // Update user
+    const updatedUser = await prisma.user.update({
+      where: { firebaseUid },
+      data: ( { savedCourses: updatedSavedCourses } as any ),
+    });
+
+    return res.status(200).json({
+      success: true,
+      savedCourses: (updatedUser as any).savedCourses,
+      isSaved: updatedSavedCourses.includes(courseId),
+    });
+  } catch (error: any) {
+    console.error('Error toggling saved course:', error);
+    return res.status(500).json({
+      error: 'Failed to toggle saved course',
+      details: error.message,
+    });
   }
 };
