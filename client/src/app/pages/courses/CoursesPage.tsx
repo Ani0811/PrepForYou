@@ -1,11 +1,10 @@
 "use client";
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { BookOpen, Clock, Award, Bookmark, X } from 'lucide-react';
+import { BookOpen, Clock, Award, Bookmark, X, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
@@ -28,6 +27,9 @@ export default function CoursesPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
+  // Prevents the searchParams effect from overwriting state when the modal
+  // was opened by clicking a course card (which also pushes the courseId to the URL).
+  const skipUrlEffect = useRef(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -42,33 +44,68 @@ export default function CoursesPage() {
     return () => unsub();
   }, []);
 
-  // Handle courseId from URL query params
+  // Handle courseId from URL query params.
+  // Important: when openCourseDetails() pushes a new URL it also sets selectedCourse
+  // correctly, so we must not overwrite that state. We use skipUrlEffect ref to skip
+  // one execution of this effect after a card-click.
   useEffect(() => {
     const courseId = searchParams.get('courseId');
-    if (courseId && user) {
-      // Fetch the course and open the modal
+
+    // Card-click path: state was already set correctly — just skip.
+    if (skipUrlEffect.current) {
+      skipUrlEffect.current = false;
+      return;
+    }
+
+    if (!courseId) return;
+
+    // Guest user: fetch basic course info (no enrollment data).
+    if (!user) {
       getCourseById(courseId)
         .then((course) => {
-          // Convert Course to CourseWithProgress
-          const courseWithProgress: CourseWithProgress = {
+          setSelectedCourse({
             ...course,
             progress: 0,
             status: 'not-started',
             startedAt: null,
             completedAt: null,
-            lastAccessedAt: null
-          };
-          setSelectedCourse(courseWithProgress);
+            lastAccessedAt: null,
+          });
           setIsDetailsModalOpen(true);
         })
-        .catch((error) => {
-          console.error('Error fetching course from URL:', error);
+        .catch(() => {
           toast.error('Course not found');
-          // Remove invalid courseId from URL
           router.replace('/courses');
         });
+      return;
     }
-  }, [searchParams, user, router]);
+
+    // Logged-in: check already-loaded courses list first (has accurate status/progress).
+    const existing = courses.find((c) => c.id === courseId);
+    if (existing) {
+      setSelectedCourse(existing);
+      setIsDetailsModalOpen(true);
+      return;
+    }
+
+    // Courses list not yet populated (fresh page load via shared URL) —
+    // fetch with real enrollment data instead of hardcoding not-started.
+    getCoursesWithProgress(user.uid)
+      .then((allCourses) => {
+        const found = allCourses.find((c) => c.id === courseId);
+        if (found) {
+          setSelectedCourse(found);
+          setIsDetailsModalOpen(true);
+        } else {
+          toast.error('Course not found');
+          router.replace('/courses');
+        }
+      })
+      .catch(() => {
+        toast.error('Course not found');
+        router.replace('/courses');
+      });
+  }, [searchParams, user, router, courses]);
 
   const fetchCourses = async (firebaseUid: string, category?: string) => {
     setIsLoading(true);
@@ -166,9 +203,10 @@ export default function CoursesPage() {
   };
 
   const openCourseDetails = (course: CourseWithProgress) => {
-    // Navigate to course URL for shareability
+    // Tell the searchParams effect to skip its next run — we're setting state here
+    // correctly already, and the URL push would otherwise re-trigger it.
+    skipUrlEffect.current = true;
     router.push(`/courses?courseId=${course.id}`);
-    // Optimistically set state for immediate UI feedback
     setSelectedCourse(course);
     setIsDetailsModalOpen(true);
   };
@@ -412,25 +450,45 @@ export default function CoursesPage() {
                   return (
                     <Card
                       key={course.id}
-                      className="group relative flex flex-col h-full bg-card/40 backdrop-blur-xl border-2 border-border/50 rounded-[28px] overflow-hidden transition-all duration-500 hover:border-primary/50 hover:shadow-xl hover:-translate-y-2"
+                      className={`group relative flex flex-col h-full bg-card/40 backdrop-blur-xl border-2 rounded-[28px] overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer ${
+                        course.status === 'completed'
+                          ? 'border-emerald-500/30 hover:border-emerald-500/60 hover:shadow-emerald-500/10'
+                          : course.status === 'in-progress'
+                          ? 'border-primary/30 hover:border-primary/60 hover:shadow-primary/10'
+                          : 'border-border/50 hover:border-primary/50'
+                      }`}
                       onClick={() => openCourseDetails(course)}
                     >
                       <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                       <CardHeader className="relative p-6 pb-3">
                         <div className="flex items-center justify-between mb-4">
-                          <div className="w-12 h-12 rounded-xl bg-linear-to-br from-primary/20 to-primary/5 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg border border-primary/20">
-                            <BookOpen className="h-6 w-6 text-primary" />
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg ${
+                            course.status === 'completed'
+                              ? 'bg-gradient-to-br from-emerald-400 to-teal-600'
+                              : course.status === 'in-progress'
+                              ? 'bg-gradient-to-br from-primary to-indigo-700'
+                              : 'bg-gradient-to-br from-primary/50 to-indigo-700/50 border border-primary/20'
+                          }`}>
+                            {course.status === 'completed'
+                              ? <CheckCircle2 className="h-6 w-6 text-white" />
+                              : course.status === 'in-progress'
+                              ? <TrendingUp className="h-6 w-6 text-white" />
+                              : <BookOpen className="h-6 w-6 text-white/80" />
+                            }
                           </div>
-                          <Badge
-                            variant={status.variant}
-                            className={`px-3 py-1 rounded-full text-[9px] uppercase tracking-widest font-bold shadow-inner ${status.label === 'Completed' ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/20' :
-                              status.label === 'In Progress' ? 'bg-primary/20 text-primary border-primary/20' :
-                                'bg-muted/50 text-muted-foreground border-transparent'
-                              }`}
-                          >
+                          <span className={`flex items-center gap-1.5 text-[10px] font-semibold rounded-full px-2.5 py-1 border ${
+                            course.status === 'completed'
+                              ? 'text-emerald-400/90 border-emerald-400/30 bg-emerald-400/5'
+                              : course.status === 'in-progress'
+                              ? 'text-primary/90 border-primary/30 bg-primary/5'
+                              : 'text-muted-foreground/70 border-muted-foreground/20 bg-muted/20'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              course.status === 'completed' ? 'bg-emerald-400/80' : course.status === 'in-progress' ? 'bg-primary/80' : 'bg-muted-foreground/40'
+                            }`} />
                             {status.label}
-                          </Badge>
+                          </span>
                         </div>
                         <CardTitle className="text-xl font-display font-bold leading-tight group-hover:text-primary transition-colors duration-300">
                           {course.title}
@@ -449,29 +507,38 @@ export default function CoursesPage() {
                           </div>
                           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/30 border border-border/30 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                             <Clock className="h-3.5 w-3.5 text-orange-500" />
-                            {Math.round(course.duration / 60)}h
+                            {course.duration >= 60
+                              ? `${Math.floor(course.duration / 60)}h${course.duration % 60 > 0 ? ` ${course.duration % 60}m` : ''}`
+                              : `${course.duration}m`}
                           </div>
                         </div>
 
                         <div className="pt-2 space-y-4 mt-auto">
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium font-display text-muted-foreground">Progress</span>
-                              <span className="text-2xl font-display font-bold gradient-text">{course.progress}%</span>
+                              <span className={`text-xs font-bold font-display ${
+                                course.status === 'completed' ? 'text-emerald-400' : course.status === 'in-progress' ? 'text-primary' : 'text-muted-foreground/50'
+                              }`}>{course.progress}%</span>
                             </div>
-                            <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
-                              <div className="h-full gradient-bg-primary transition-all duration-1000 ease-out" style={{ width: `${course.progress}%` }} />
+                            <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
+                              <div className={`h-full transition-all duration-1000 ease-out rounded-full ${
+                                course.status === 'completed' ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'gradient-bg-primary'
+                              }`} style={{ width: `${course.progress}%` }} />
                             </div>
                           </div>
 
                           <Button
-                            className="w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 gradient-bg-primary hover:shadow-lg group-hover:translate-y-0.5 active:scale-95"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCourseDetails(course);
-                            }}
+                            className={`w-full h-11 rounded-xl font-bold text-sm transition-all duration-300 hover:shadow-lg active:scale-95 ${
+                              course.status === 'completed'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                                : course.status === 'in-progress'
+                                ? 'gradient-bg-primary shadow-primary/20'
+                                : 'gradient-bg-primary shadow-primary/20'
+                            }`}
+                            onClick={(e) => { e.stopPropagation(); openCourseDetails(course); }}
                           >
-                            Browse Course
+                            {course.status === 'completed' ? 'Review Course' : course.status === 'in-progress' ? 'Continue Learning' : 'Enroll Now'}
                           </Button>
                         </div>
                       </CardContent>
