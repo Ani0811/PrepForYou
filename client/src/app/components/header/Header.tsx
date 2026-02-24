@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Home, BookOpen, TrendingUp, User, LogIn, UserPlus, LogOut, Shield } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, User, LogIn, UserPlus, LogOut, Shield, Library, ChevronDown, FileText, ClipboardList, Newspaper, MessageSquare } from 'lucide-react';
 import ThemeSwitcher from '../theme/ThemeSwitcher';
 import ProfileSetupModal from '../profilesetup/ProfileSetupModal';
 import { auth } from '../../lib/firebase';
@@ -136,6 +136,13 @@ export default function Header() {
     { href: '/progress', label: 'Progress', icon: TrendingUp },
   ];
 
+  const resourceItems = [
+    { href: '/study-guide', label: 'Study Guide', icon: FileText },
+    { href: '/practice-tests', label: 'Practice Tests', icon: ClipboardList },
+    { href: '/blogs', label: 'Blogs', icon: Newspaper },
+    { href: '/discussion-forum', label: 'Discussion Forum', icon: MessageSquare },
+  ];
+
   const getRoleBadge = (role?: string | null) => {
     if (!role) return null;
     const r = String(role).toLowerCase();
@@ -190,6 +197,32 @@ export default function Header() {
                   </Link>
                 );
               })}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-300 font-medium text-muted-foreground hover:text-foreground gradient-bg-accent hover:scale-105 outline-none">
+                    <Library className="h-4 w-4" />
+                    <span className="font-display">Resources</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-52 p-1.5 shadow-2xl border border-border bg-popover/100 backdrop-blur-xl text-popover-foreground rounded-lg z-60"
+                  align="start"
+                  sideOffset={8}
+                >
+                  {resourceItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem key={item.label} asChild className="cursor-pointer py-2.5 px-3 rounded-md transition-all hover:bg-accent focus:bg-accent">
+                        <Link href={item.href} className="flex items-center gap-3 font-display font-medium">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
 
@@ -203,6 +236,30 @@ export default function Header() {
                   </Link>
                 );
               })}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button title="Resources" className="p-2 rounded-md transition-all duration-300 text-muted-foreground hover:text-foreground gradient-bg-accent hover:scale-105 outline-none">
+                    <Library className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-52 p-1.5 shadow-2xl border border-border bg-popover/100 backdrop-blur-xl text-popover-foreground rounded-lg z-60"
+                  align="start"
+                  sideOffset={8}
+                >
+                  {resourceItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem key={item.label} asChild className="cursor-pointer py-2.5 px-3 rounded-md transition-all hover:bg-accent focus:bg-accent">
+                        <Link href={item.href} className="flex items-center gap-3 font-display font-medium">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
 
             <ThemeSwitcher />

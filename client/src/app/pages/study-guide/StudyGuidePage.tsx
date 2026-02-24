@@ -36,6 +36,8 @@ import {
   RefreshCw,
   Brain,
   ArrowLeft,
+  Sparkles,
+  ScrollText,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,6 +185,17 @@ export default function StudyGuidePage() {
   const currentCard = currentCards[flashcardIndex];
   const flashcardProgress = currentCards.length > 0 ? ((flashcardIndex + 1) / currentCards.length) * 100 : 0;
 
+  const formatDate = (iso?: string | null) => {
+    try {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-GB'); // dd/mm/yyyy
+    } catch {
+      return '';
+    }
+  };
+
   // ── List loading skeleton ───────────────────────────────────────────
 
   if (isLoadingList) {
@@ -232,10 +245,22 @@ export default function StudyGuidePage() {
           <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight gradient-text transition-all duration-300 pb-1 leading-tight">
             {selectedGuide.title}
           </h1>
-          <p className="text-muted-foreground text-sm">
-            {selectedGuide.keyConcepts.length} concepts · {selectedGuide.quickRefs.length} references ·{' '}
-            {selectedGuide.flashcards.length} flashcards
-          </p>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+              {selectedGuide.keyConcepts.length} concepts
+            </span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-sky-400" />
+              {selectedGuide.quickRefs.length} references
+            </span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-emerald-400" />
+              {selectedGuide.flashcards.length} flashcards
+            </span>
+          </div>
         </div>
 
         <Card className="backdrop-blur-sm gradient-card border-gradient">
@@ -247,18 +272,18 @@ export default function StudyGuidePage() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
                 <TabsList className="h-auto flex-wrap gap-1">
                   <TabsTrigger value="overview" className="gap-1.5">
-                    <FileText className="h-4 w-4" /> Overview
+                    <FileText className="h-4 w-4 text-primary" /> Overview
                   </TabsTrigger>
                   <TabsTrigger value="concepts" className="gap-1.5">
-                    <Lightbulb className="h-4 w-4" /> Key Concepts
+                    <Lightbulb className="h-4 w-4 text-amber-400" /> Key Concepts
                     <Badge variant="secondary" className="text-xs ml-1">{selectedGuide.keyConcepts.length}</Badge>
                   </TabsTrigger>
                   <TabsTrigger value="references" className="gap-1.5">
-                    <BookOpen className="h-4 w-4" /> Quick Reference
+                    <BookOpen className="h-4 w-4 text-sky-400" /> Quick Reference
                     <Badge variant="secondary" className="text-xs ml-1">{selectedGuide.quickRefs.length}</Badge>
                   </TabsTrigger>
                   <TabsTrigger value="flashcards" className="gap-1.5">
-                    <Layers className="h-4 w-4" /> Flashcards
+                    <Layers className="h-4 w-4 text-emerald-400" /> Flashcards
                     <Badge variant="secondary" className="text-xs ml-1">{selectedGuide.flashcards.length}</Badge>
                   </TabsTrigger>
                 </TabsList>
@@ -279,26 +304,58 @@ export default function StudyGuidePage() {
               {/* Overview */}
               <TabsContent value="overview" className="space-y-6">
                 {selectedGuide.overview && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <p className="text-sm text-muted-foreground leading-relaxed">{selectedGuide.overview}</p>
+                  <div className="relative flex rounded-xl bg-gradient-to-br from-primary/8 to-primary/3 border border-primary/20 overflow-hidden">
+                    <div className="w-1 shrink-0 bg-gradient-to-b from-primary to-indigo-600 rounded-l-xl" />
+                    <div className="p-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-primary/80 font-display">Introduction</span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-foreground/85">{selectedGuide.overview}</p>
+                    </div>
                   </div>
                 )}
-                <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                  {selectedGuide.summary}
-                </div>
+                {selectedGuide.summary && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <ScrollText className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 font-display">Summary</span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                    <div className="space-y-3">
+                      {selectedGuide.summary.split(/\n\n+/).filter(Boolean).map((para, i) => (
+                        <p
+                          key={i}
+                          className={i === 0
+                            ? 'text-base font-medium leading-relaxed text-foreground/95'
+                            : 'text-sm leading-relaxed text-foreground/75'
+                          }
+                        >
+                          {para.trim()}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-4 sm:grid-cols-3 pt-2">
-                  <button onClick={() => setActiveTab('concepts')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-primary/40 transition-all duration-300 text-left">
-                    <Lightbulb className="h-8 w-8 text-primary mb-3" />
+                  <button onClick={() => setActiveTab('concepts')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-amber-400/40 transition-all duration-300 text-left group">
+                    <div className="w-11 h-11 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-300">
+                      <Lightbulb className="h-5 w-5 text-white" />
+                    </div>
                     <h3 className="font-display font-semibold text-base mb-1">Key Concepts</h3>
                     <p className="text-xs text-muted-foreground">{selectedGuide.keyConcepts.length} essential topics</p>
                   </button>
-                  <button onClick={() => setActiveTab('references')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-primary/40 transition-all duration-300 text-left">
-                    <BookOpen className="h-8 w-8 text-primary mb-3" />
+                  <button onClick={() => setActiveTab('references')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-sky-400/40 transition-all duration-300 text-left group">
+                    <div className="w-11 h-11 rounded-md bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-300">
+                      <BookOpen className="h-5 w-5 text-white" />
+                    </div>
                     <h3 className="font-display font-semibold text-base mb-1">Quick Reference</h3>
                     <p className="text-xs text-muted-foreground">{selectedGuide.quickRefs.length} cheatsheet items</p>
                   </button>
-                  <button onClick={() => setActiveTab('flashcards')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-primary/40 transition-all duration-300 text-left">
-                    <Layers className="h-8 w-8 text-primary mb-3" />
+                  <button onClick={() => setActiveTab('flashcards')} className="p-6 rounded-lg border gradient-card hover:shadow-gradient-md hover:border-emerald-400/40 transition-all duration-300 text-left group">
+                    <div className="w-11 h-11 rounded-md bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-300">
+                      <Layers className="h-5 w-5 text-white" />
+                    </div>
                     <h3 className="font-display font-semibold text-base mb-1">Flashcards</h3>
                     <p className="text-xs text-muted-foreground">{selectedGuide.flashcards.length} review cards</p>
                   </button>
@@ -315,12 +372,15 @@ export default function StudyGuidePage() {
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
                     {filteredConcepts.map((concept) => (
-                      <div key={concept.id} className="p-4 rounded-lg border gradient-card hover:border-primary/40 transition-all duration-200">
+                      <div key={concept.id} className="p-4 rounded-lg border border-l-2 border-l-amber-400/50 gradient-card hover:border-amber-400/50 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-400/10 hover:bg-amber-400/[0.03] transition-all duration-200 cursor-default">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h4 className="font-semibold text-sm leading-tight">{concept.term}</h4>
-                          <div className="flex gap-1 flex-wrap justify-end shrink-0">
+                          <h4 className="font-semibold text-sm leading-tight flex items-center gap-1.5"><Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0" />{concept.term}</h4>
+                          <div className="flex gap-1.5 flex-wrap justify-end shrink-0">
                             {concept.tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                              <span key={tag} className="flex items-center gap-1 text-[10px] font-medium text-amber-400/80 border border-amber-400/30 rounded-full px-2 py-0.5 bg-amber-400/5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70 shrink-0" />
+                                {tag}
+                              </span>
                             ))}
                           </div>
                         </div>
@@ -341,13 +401,17 @@ export default function StudyGuidePage() {
                 ) : (
                   <Accordion type="multiple" className="space-y-2">
                     {filteredRefs.map((ref) => (
-                      <AccordionItem key={ref.id} value={ref.id} className="border gradient-card rounded-lg px-4">
+                      <AccordionItem key={ref.id} value={ref.id} className="border border-l-2 border-l-sky-400/50 gradient-card rounded-lg px-4 hover:border-sky-400/50 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-sky-400/10 hover:bg-sky-400/[0.03] transition-all duration-200">
                         <AccordionTrigger className="hover:no-underline py-3">
-                          <div className="flex items-center gap-3 text-left">
+                          <div className="flex items-center gap-3 text-left flex-wrap">
+                            <BookOpen className="h-3.5 w-3.5 text-sky-400 shrink-0" />
                             <span className="font-semibold text-sm">{ref.title}</span>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1.5 flex-wrap">
                               {ref.tags.slice(0, 2).map((tag) => (
-                                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                                <span key={tag} className="flex items-center gap-1 text-[10px] font-medium text-sky-400/80 border border-sky-400/30 rounded-full px-2 py-0.5 bg-sky-400/5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400/70 shrink-0" />
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           </div>
@@ -377,9 +441,18 @@ export default function StudyGuidePage() {
                           {reviewMode && <span className="ml-2 text-primary font-medium">(Review mode)</span>}
                         </span>
                         {currentCard && (
-                          <Badge variant={currentCard.difficulty === 'easy' ? 'default' : currentCard.difficulty === 'hard' ? 'destructive' : 'secondary'} className="text-xs">
+                          <span className={`flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 border ${
+                            currentCard.difficulty === 'easy'
+                              ? 'text-emerald-400/90 border-emerald-400/30 bg-emerald-400/5'
+                              : currentCard.difficulty === 'hard'
+                              ? 'text-red-400/90 border-red-400/30 bg-red-400/5'
+                              : 'text-orange-400/90 border-orange-400/30 bg-orange-400/5'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              currentCard.difficulty === 'easy' ? 'bg-emerald-400/70' : currentCard.difficulty === 'hard' ? 'bg-red-400/70' : 'bg-orange-400/70'
+                            }`} />
                             {currentCard.difficulty}
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       <div className="flex gap-2">
@@ -393,20 +466,34 @@ export default function StudyGuidePage() {
                       </div>
                     </div>
 
-                    <div className="cursor-pointer select-none" style={{ perspective: '1000px' }} onClick={() => setIsFlipped((f) => !f)}>
+                    <div className="cursor-pointer select-none group transition-all duration-200 hover:-translate-y-0.5 hover:drop-shadow-[0_8px_24px_rgba(52,211,153,0.12)]" style={{ perspective: '1000px' }} onClick={() => setIsFlipped((f) => !f)}>
                       <div className="relative w-full min-h-52 transition-all duration-500" style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
-                        <div className="absolute inset-0 p-8 rounded-xl border gradient-card flex flex-col items-center justify-center gap-3" style={{ backfaceVisibility: 'hidden' }}>
-                          <Badge variant="outline" className="text-xs">Question</Badge>
+                        <div className="absolute inset-0 p-8 rounded-xl border border-l-2 border-l-emerald-400/50 gradient-card flex flex-col items-center justify-center gap-3" style={{ backfaceVisibility: 'hidden' }}>
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400/80 border border-emerald-400/30 rounded-full px-2 py-0.5 bg-emerald-400/5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70 shrink-0" />
+                            Question
+                          </span>
                           <p className="text-lg font-display font-semibold text-center leading-relaxed">{currentCard?.front}</p>
                           {currentCard?.tags.length ? (
-                            <div className="flex gap-1 flex-wrap justify-center mt-1">
-                              {currentCard.tags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+                            <div className="flex gap-1.5 flex-wrap justify-center mt-1">
+                              {currentCard.tags.map((t) => (
+                                <span key={t} className="flex items-center gap-1 text-[10px] font-medium text-emerald-400/80 border border-emerald-400/30 rounded-full px-2 py-0.5 bg-emerald-400/5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70 shrink-0" />
+                                  {t}
+                                </span>
+                              ))}
                             </div>
                           ) : null}
-                          <p className="text-xs text-muted-foreground mt-3">Click to reveal answer</p>
+                          <span className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/50 border border-muted-foreground/20 rounded-full px-2.5 py-0.5 bg-muted/20 mt-3">
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0 animate-pulse" />
+                            Click to reveal answer
+                          </span>
                         </div>
-                        <div className="absolute inset-0 p-8 rounded-xl border border-primary/30 bg-primary/5 flex flex-col items-center justify-center gap-3" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                          <Badge variant="default" className="text-xs">Answer</Badge>
+                        <div className="absolute inset-0 p-8 rounded-xl border border-l-2 border-l-primary/50 bg-primary/5 flex flex-col items-center justify-center gap-3" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-primary/80 border border-primary/30 rounded-full px-2 py-0.5 bg-primary/5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary/70 shrink-0" />
+                            Answer
+                          </span>
                           <p className="text-base text-center leading-relaxed">{currentCard?.back}</p>
                         </div>
                       </div>
@@ -418,10 +505,18 @@ export default function StudyGuidePage() {
                       </Button>
                       {isFlipped ? (
                         <div className="flex gap-2 flex-wrap justify-center">
-                          <Button size="sm" variant="destructive" className="gap-1 text-xs" onClick={() => handleRateFlashcard(1)}><X className="h-3 w-3" /> Again</Button>
-                          <Button size="sm" variant="outline" className="gap-1 text-xs border-orange-500/50 text-orange-400 hover:text-orange-300" onClick={() => handleRateFlashcard(2)}>Hard</Button>
-                          <Button size="sm" variant="outline" className="gap-1 text-xs border-blue-500/50 text-blue-400 hover:text-blue-300" onClick={() => handleRateFlashcard(3)}>Good</Button>
-                          <Button size="sm" variant="outline" className="gap-1 text-xs border-green-500/50 text-green-400 hover:text-green-300" onClick={() => handleRateFlashcard(4)}><Check className="h-3 w-3" /> Easy</Button>
+                          <button onClick={() => handleRateFlashcard(1)} className="flex items-center gap-1.5 text-[11px] font-medium text-red-400/90 border border-red-400/30 rounded-full px-3 py-1 bg-red-400/5 hover:bg-red-400/15 hover:border-red-400/50 transition-all duration-150">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400/70 shrink-0" /><X className="h-3 w-3" /> Again
+                          </button>
+                          <button onClick={() => handleRateFlashcard(2)} className="flex items-center gap-1.5 text-[11px] font-medium text-orange-400/90 border border-orange-400/30 rounded-full px-3 py-1 bg-orange-400/5 hover:bg-orange-400/15 hover:border-orange-400/50 transition-all duration-150">
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400/70 shrink-0" /> Hard
+                          </button>
+                          <button onClick={() => handleRateFlashcard(3)} className="flex items-center gap-1.5 text-[11px] font-medium text-blue-400/90 border border-blue-400/30 rounded-full px-3 py-1 bg-blue-400/5 hover:bg-blue-400/15 hover:border-blue-400/50 transition-all duration-150">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400/70 shrink-0" /> Good
+                          </button>
+                          <button onClick={() => handleRateFlashcard(4)} className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400/90 border border-emerald-400/30 rounded-full px-3 py-1 bg-emerald-400/5 hover:bg-emerald-400/15 hover:border-emerald-400/50 transition-all duration-150">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/70 shrink-0" /><Check className="h-3 w-3" /> Easy
+                          </button>
                         </div>
                       ) : (
                         <Button variant="ghost" size="sm" className="gap-2" onClick={() => setIsFlipped(true)}><RotateCcw className="h-4 w-4" /> Reveal Answer</Button>
@@ -431,7 +526,7 @@ export default function StudyGuidePage() {
                       </Button>
                     </div>
 
-                    <Progress value={flashcardProgress} className="h-1.5" />
+                    <Progress value={flashcardProgress} className="h-1.5 [&>div]:bg-emerald-500" />
                   </div>
                 )}
               </TabsContent>
@@ -488,19 +583,21 @@ export default function StudyGuidePage() {
               className="text-left p-6 rounded-xl border gradient-card hover:shadow-gradient-md hover:border-primary/40 transition-all duration-300 space-y-3"
             >
               <div className="flex items-start justify-between gap-2">
-                <BookMarked className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-md bg-gradient-to-br from-primary to-indigo-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <BookMarked className="h-5 w-5 text-white" />
+                </div>
                 {!guide.isPublished && (
                   <Badge variant="outline" className="text-xs shrink-0">Draft</Badge>
                 )}
               </div>
               <h3 className="font-display font-semibold text-base leading-snug">{guide.title}</h3>
               <div className="flex gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Lightbulb className="h-3.5 w-3.5" />{guide._count.keyConcepts} concepts</span>
-                <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{guide._count.quickRefs} refs</span>
-                <span className="flex items-center gap-1"><Layers className="h-3.5 w-3.5" />{guide._count.flashcards} cards</span>
+                <span className="flex items-center gap-1"><Lightbulb className="h-3.5 w-3.5 text-amber-400" />{guide._count.keyConcepts} concepts</span>
+                <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-sky-400" />{guide._count.quickRefs} refs</span>
+                <span className="flex items-center gap-1"><Layers className="h-3.5 w-3.5 text-emerald-400" />{guide._count.flashcards} cards</span>
               </div>
               <p className="text-xs text-muted-foreground/60">
-                Updated {new Date(guide.updatedAt).toLocaleDateString()}
+                Updated {formatDate(guide.updatedAt)}
               </p>
             </button>
           ))}
@@ -508,4 +605,4 @@ export default function StudyGuidePage() {
       )}
     </div>
   );
-}
+}
