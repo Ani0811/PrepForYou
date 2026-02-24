@@ -8,6 +8,7 @@ import cors from 'cors';
 import userRoutes from './routes/user.routes';
 import courseRoutes from './routes/course.routes';
 import adminRoutes from './routes/admin.routes';
+import studyGuideRoutes from './routes/study-guide.routes';
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -29,6 +30,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/api/users', userRoutes)
 app.use('/api/courses', courseRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/study-guides', studyGuideRoutes)
 
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: any) => {

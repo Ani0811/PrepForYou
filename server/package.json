@@ -11,14 +11,14 @@
     "@types/node": "^25.0.10",
     "@types/pg": "^8.16.0",
     "dotenv": "^17.2.3",
-    "prisma": "^7.3.0",
+    "prisma": "^7.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/adapter-pg": "^7.3.0",
-    "@prisma/client": "^7.3.0",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "pg": "^8.17.2"

@@ -247,4 +247,91 @@ Generate exactly ${count} lessons now.`;
             throw new Error(`Failed to generate lesson plan: ${err instanceof Error ? err.message : String(err)}`);
         }
     }
+
+    static async generateStudyGuide(
+        courseTitle: string,
+        courseDescription: string,
+        difficulty: string,
+        lessons: { title: string; content: string }[]
+    ): Promise<{
+        summary: string;
+        overview: string;
+        keyConcepts: { term: string; definition: string; tags: string[] }[];
+        quickRefs: { title: string; content: string; tags: string[] }[];
+        flashcards: { front: string; back: string; difficulty: string; tags: string[] }[];
+    }> {
+        const model = this.getModel();
+
+        const lessonSummaries = lessons
+            .slice(0, 20)
+            .map((l, i) => `${i + 1}. ${l.title}: ${l.content.substring(0, 300).replace(/\n/g, ' ')}`)
+            .join('\n');
+
+        const prompt = `You are an expert educational content creator. Create a comprehensive study guide for the following course.
+
+Course: "${courseTitle}"
+Level: ${difficulty}
+Description: ${courseDescription}
+
+Lessons:
+${lessonSummaries}
+
+Generate a study guide with EXACTLY this JSON structure (no markdown, just raw JSON):
+{
+  "summary": "A detailed 2-3 paragraph markdown summary of the entire course covering the main topics, what students will learn, and key takeaways",
+  "overview": "A single concise paragraph (2-3 sentences) describing the course scope and purpose",
+  "keyConcepts": [
+    { "term": "Term name", "definition": "Clear, concise definition (1-2 sentences)", "tags": ["tag1", "tag2"] }
+  ],
+  "quickRefs": [
+    { "title": "Reference title", "content": "Reference content — can be a list, formula, syntax, or key fact (plain text, no markdown)", "tags": ["tag1"] }
+  ],
+  "flashcards": [
+    { "front": "Question or prompt", "back": "Answer or explanation", "difficulty": "easy|medium|hard", "tags": ["tag1"] }
+  ]
+}
+
+Requirements:
+- keyConcepts: exactly 12-15 items covering all major topics
+- quickRefs: exactly 6-10 items as concise cheatsheet entries  
+- flashcards: exactly 12-16 items mixing easy, medium, and hard difficulty
+- All text must be plain English, no markdown inside individual string fields
+- Tags should be 1-3 short lowercase words relevant to the content
+
+Return ONLY the JSON object, no code fences.`;
+
+        try {
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            let text = (await response.text()).trim();
+
+            if (text.startsWith('```')) {
+                text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/s, '').trim();
+            }
+
+            let parsed: any = null;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                const first = text.indexOf('{');
+                const last = text.lastIndexOf('}');
+                if (first !== -1 && last !== -1) {
+                    const candidate = text.slice(first, last + 1).replace(/,\s*([}\]])/g, '$1');
+                    parsed = JSON.parse(candidate);
+                }
+            }
+
+            if (!parsed) throw new Error('Failed to parse study guide JSON from Gemini');
+
+            return {
+                summary: parsed.summary || '',
+                overview: parsed.overview || '',
+                keyConcepts: Array.isArray(parsed.keyConcepts) ? parsed.keyConcepts : [],
+                quickRefs: Array.isArray(parsed.quickRefs) ? parsed.quickRefs : [],
+                flashcards: Array.isArray(parsed.flashcards) ? parsed.flashcards : [],
+            };
+        } catch (err) {
+            throw new Error(`Failed to generate study guide: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    }
 }

@@ -26,6 +26,7 @@ model User {
   savedCourses        String[]  @default([]) @map("saved_courses")
 
   courseProgress      CourseProgress[]
+  flashcardProgress    UserFlashcardProgress[]
 
   @@index([email])
   @@index([firebaseUid])
@@ -52,6 +53,7 @@ model Course {
 
   courseProgress      CourseProgress[]
   lessons             Lesson[]
+  studyGuide          StudyGuide?
 
   @@index([category])
   @@index([difficulty])
@@ -117,4 +119,94 @@ model LessonProgress {
   @@index([courseProgressId])
   @@index([lessonId])
   @@map("lesson_progress")
+}
+model StudyGuide {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  courseId    String?  @unique @map("course_id") @db.Uuid
+  summary     String   @db.Text
+  overview    String?  @db.Text
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  course      Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  keyConcepts KeyConcept[]
+  quickRefs   QuickReference[]
+  flashcards  Flashcard[]
+
+  @@index([courseId])
+  @@map("study_guides")
+}
+
+model KeyConcept {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studyGuideId String     @map("study_guide_id") @db.Uuid
+  term         String
+  definition   String     @db.Text
+  tags         String[]   @default([])
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  studyGuide   StudyGuide @relation(fields: [studyGuideId], references: [id], onDelete: Cascade)
+
+  @@index([studyGuideId])
+  @@map("key_concepts")
+}
+
+model QuickReference {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studyGuideId String     @map("study_guide_id") @db.Uuid
+  title        String
+  content      String     @db.Text
+  tags         String[]   @default([])
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  studyGuide   StudyGuide @relation(fields: [studyGuideId], references: [id], onDelete: Cascade)
+
+  @@index([studyGuideId])
+  @@map("quick_references")
+}
+
+model Flashcard {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studyGuideId String     @map("study_guide_id") @db.Uuid
+  front        String     @db.Text
+  back         String     @db.Text
+  difficulty   String     @default("medium") // easy, medium, hard
+  tags         String[]   @default([])
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  studyGuide   StudyGuide            @relation(fields: [studyGuideId], references: [id], onDelete: Cascade)
+  userProgress UserFlashcardProgress[]
+
+  @@index([studyGuideId])
+  @@map("flashcards")
+}
+
+model UserFlashcardProgress {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  flashcardId  String    @map("flashcard_id") @db.Uuid
+  rating       Int?      // 1=again, 2=hard, 3=good, 4=easy
+  nextReviewAt DateTime  @default(now()) @map("next_review_at") @db.Timestamptz
+  interval     Int       @default(1)         // days until next review
+  easeFactor   Float     @default(2.5) @map("ease_factor")
+  repetitions  Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcard    Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, flashcardId])
+  @@index([userId])
+  @@index([flashcardId])
+  @@index([nextReviewAt])
+  @@map("user_flashcard_progress")
 }

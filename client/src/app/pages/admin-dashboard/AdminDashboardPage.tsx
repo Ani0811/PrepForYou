@@ -43,6 +43,9 @@ import {
   X,
   Pause,
   Play,
+  Sparkles,
+  BookMarked,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auth } from '../../lib/firebase';
@@ -77,6 +80,12 @@ import {
   toggleCoursePublishStatus,
   AddLessonPayload
 } from '../../api/courseApi';
+import {
+  generateStudyGuide,
+  getAllStudyGuides,
+  type StudyGuide as StudyGuideType,
+  type StudyGuideSummary,
+} from '../../api/studyGuideApi';
 
 interface User {
   id: string;
@@ -196,6 +205,14 @@ export default function AdminDashboardPage() {
   const [pendingRoleChange, setPendingRoleChange] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Study guide management
+  const [sgTitle, setSgTitle] = useState<string>('');
+  const [sgCourseId, setSgCourseId] = useState<string>('');
+  const [adminStudyGuide, setAdminStudyGuide] = useState<StudyGuideType | null>(null);
+  const [allAdminGuides, setAllAdminGuides] = useState<StudyGuideSummary[]>([]);
+  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
+  const [sgGuideChecked, setSgGuideChecked] = useState(false);
+
   // File upload states
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -231,7 +248,7 @@ export default function AdminDashboardPage() {
         setCurrentUserRole(userRole);
 
         // Load users and courses
-        await Promise.all([loadUsers(), loadCourses()]);
+        await Promise.all([loadUsers(), loadCourses(), loadStudyGuides()]);
       } catch (error) {
         console.error('Error initializing dashboard:', error);
         toast.error('Failed to load dashboard data');
@@ -284,6 +301,44 @@ export default function AdminDashboardPage() {
     } catch (error: any) {
       console.error('Error loading courses:', error);
       toast.error(error.message || 'Failed to load courses');
+    }
+  };
+
+  const loadStudyGuides = async () => {
+    try {
+      const guides = await getAllStudyGuides();
+      setAllAdminGuides(guides);
+    } catch {
+      // non-critical
+    }
+  };
+
+  const handleSgCourseSelect = (courseId: string) => {
+    setSgCourseId(courseId);
+    setAdminStudyGuide(null);
+    setSgGuideChecked(true);
+    // Auto-fill title from course name (user can edit)
+    const course = courses.find((c) => c.id === courseId);
+    if (course && !sgTitle) setSgTitle(course.title);
+  };
+
+  const handleAdminGenerate = async () => {
+    if (!sgTitle.trim()) { toast.error('Please enter a title for the study guide'); return; }
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    setIsGeneratingGuide(true);
+    toast.info('Generating study guide with AI… this may take 15–30 seconds.');
+    try {
+      const guide = await generateStudyGuide(sgTitle.trim(), uid, sgCourseId || undefined);
+      setAdminStudyGuide(guide);
+      // Refresh guide list
+      const updated = await getAllStudyGuides();
+      setAllAdminGuides(updated);
+      toast.success('Study guide generated successfully!');
+    } catch {
+      toast.error('Failed to generate study guide. Check Gemini API key and try again.');
+    } finally {
+      setIsGeneratingGuide(false);
     }
   };
 
@@ -1025,6 +1080,95 @@ export default function AdminDashboardPage() {
               </Card>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Study Guide Management Card */}
+      <Card className="gradient-card border-gradient backdrop-blur-sm">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <BookMarked className="h-6 w-6 text-primary" />
+            <div>
+              <CardTitle className="font-display text-2xl">Study Guide Management</CardTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Generate or regenerate AI-powered study guides for any course.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <div className="w-full sm:w-80">
+              <Select value={sgCourseId} onValueChange={handleSgCourseSelect}>
+                <SelectTrigger className="border-gradient bg-card">
+                  <SelectValue placeholder="Link to a course (optional)…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Input
+              className="flex-1"
+              placeholder="Study guide title (required)"
+              value={sgTitle}
+              onChange={(e) => setSgTitle(e.target.value)}
+            />
+
+            <Button
+              onClick={handleAdminGenerate}
+              disabled={isGeneratingGuide || !sgTitle.trim()}
+              className="gap-2 gradient-bg-primary shrink-0"
+            >
+              {isGeneratingGuide ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {isGeneratingGuide ? 'Generating…' : 'Generate with AI'}
+            </Button>
+          </div>
+
+          {sgGuideChecked && (
+            adminStudyGuide ? (
+              <div className="p-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <BookMarked className="h-8 w-8 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="font-semibold text-sm text-emerald-600 dark:text-emerald-400">Course already has a study guide</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Generating will create a new independent guide with the title above.</p>
+                </div>
+              </div>
+            ) : sgCourseId ? (
+              <div className="p-4 rounded-lg border border-blue-500/20 bg-blue-500/5 flex items-center gap-3">
+                <Sparkles className="h-8 w-8 text-blue-400 shrink-0" />
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  Course selected as AI context. Set a title above and click <strong>Generate with AI</strong>.
+                </p>
+              </div>
+            ) : null
+          )}
+
+          {/* Existing guides list */}
+          {allAdminGuides.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Existing study guides</p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {allAdminGuides.map((g) => (
+                  <div key={g.id} className="p-3 rounded-lg border gradient-card text-sm">
+                    <p className="font-semibold truncate">{g.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {g._count.keyConcepts} concepts · {g._count.quickRefs} refs · {g._count.flashcards} cards
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
